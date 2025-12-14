@@ -1,0 +1,165 @@
+/* Основные стили */
+.root {
+    -fx-font-family: "Segoe UI", Arial, sans-serif;
+    -fx-font-size: 12px;
+    -fx-base: #2d2d2d;
+    -fx-background: #1e1e1e;
+    -fx-color: -fx-base;
+    -fx-control-inner-background: #2d2d2d;
+    -fx-text-fill: #e0e0e0;
+}
+
+/* Панели */
+.left-panel, .right-panel {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #3d3d3d;
+}
+
+.left-panel {
+    -fx-border-width: 0 1 0 0;
+    -fx-padding: 10;
+}
+
+.right-panel {
+    -fx-border-width: 0 0 0 1;
+    -fx-padding: 10;
+}
+
+/* Метки секций */
+.section-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #64b5f6;
+    -fx-padding: 0 0 5 0;
+}
+
+/* 3D-вид */
+.view-3d {
+    -fx-background-color: #1a1a2e;
+}
+
+/* Строка состояния */
+.status-bar {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #3d3d3d;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 5;
+}
+
+#status-label {
+    -fx-text-fill: #81c784;
+    -fx-font-weight: bold;
+}
+
+#vertex-count, #polygon-count {
+    -fx-text-fill: #bbbbbb;
+}
+
+/* Кнопки */
+.button {
+    -fx-background-color: #3d3d3d;
+    -fx-text-fill: #e0e0e0;
+    -fx-background-radius: 3;
+    -fx-padding: 5 10 5 10;
+}
+
+.button:hover {
+    -fx-background-color: #4d4d4d;
+}
+
+.button:pressed {
+    -fx-background-color: #2d2d2d;
+}
+
+/* Списки */
+.list-view {
+    -fx-background-color: #252525;
+    -fx-border-color: #3d3d3d;
+    -fx-pref-height: 300;
+}
+
+.list-cell {
+    -fx-background-color: #252525;
+    -fx-text-fill: #e0e0e0;
+    -fx-padding: 5;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: #2a4d69;
+    -fx-text-fill: white;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: #3d3d3d;
+}
+
+/* Слайдеры */
+.slider .track {
+    -fx-background-color: #3d3d3d;
+}
+
+.slider .thumb {
+    -fx-background-color: #64b5f6;
+}
+
+/* Меню */
+.menu-bar {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #3d3d3d;
+    -fx-border-width: 0 0 1 0;
+}
+
+.menu-bar .menu {
+    -fx-text-fill: #e0e0e0;
+}
+
+.menu-bar .menu:hover {
+    -fx-background-color: #3d3d3d;
+}
+
+.menu-item {
+    -fx-background-color: #2d2d2d;
+    -fx-text-fill: #e0e0e0;
+}
+
+.menu-item:hover {
+    -fx-background-color: #3d3d3d;
+}
+
+/* CheckBox и RadioButton */
+.check-box, .radio-button {
+    -fx-text-fill: #e0e0e0;
+}
+
+.check-box .box, .radio-button .radio {
+    -fx-background-color: #3d3d3d;
+    -fx-border-color: #64b5f6;
+}
+
+/* TextField */
+.text-field {
+    -fx-background-color: #3d3d3d;
+    -fx-text-fill: #e0e0e0;
+    -fx-border-color: #4d4d4d;
+    -fx-border-radius: 2;
+    -fx-padding: 5;
+}
+
+/* ColorPicker */
+.color-picker {
+    -fx-background-color: #3d3d3d;
+    -fx-text-fill: #e0e0e0;
+}
+
+/* Разделители */
+.separator .line {
+    -fx-border-color: #3d3d3d;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* Заголовок окна */
+.title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+}
