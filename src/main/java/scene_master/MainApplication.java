@@ -1,20 +1,29 @@
 package scene_master;
 
-import scene_master.manager.SceneManager; // менеджер сцены с моделями
-import scene_master.manager.SelectionManager; // менеджер выделения моделей
-import scene_master.model.Model3D; // ui-представление модели
-import scene_master.model.ModelWrapper; // связка между данными и ui
-import scene_master.reader.ObjReader; // загрузчик obj-файлов
-import scene_master.util.DialogHelper; // помощник для диалоговых окон
-import javafx.application.Application; // базовый класс javaFX приложения
-import javafx.geometry.Insets; // отступы для интерфейса
-import javafx.scene.Scene; // сцена
-import javafx.scene.control.*; // элементы управления
-import javafx.scene.layout.*; // контейнеры для размещения элементов
-import javafx.stage.FileChooser; // диалог выбора файлов
-import javafx.stage.Stage; // главное окно приложения
+import scene_master.manager.SceneManager;
+import scene_master.manager.SelectionManager;
+import scene_master.manager.EditManager;
+import scene_master.model.Model3D;
+import scene_master.model.ModelWrapper;
+import scene_master.reader.ObjReader;
+import scene_master.writer.ObjWriter;
+import scene_master.util.DialogHelper;
+import scene_master.util.ErrorHandler;
+
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.paint.Color;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 
 public class MainApplication extends Application {
 
@@ -23,6 +32,8 @@ public class MainApplication extends Application {
     private SelectionManager selectionManager; // управление выделением
     private ListView<ModelWrapper> modelListView; // список моделей в ui
     private BorderPane modelPropertiesPanel; // панель свойств модели
+    private EditManager editManager = new EditManager();
+    private String currentTheme = "dark";
 
     @Override
     public void start(Stage primaryStage) { // точка входа приложения
@@ -40,11 +51,19 @@ public class MainApplication extends Application {
         root.setRight(createRightPanel()); // свойства модели справа
 
         Scene scene = new Scene(root, 1200, 800); // создаем сцену
-        scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
+
+        switchTheme("dark");// загружаем тему по умолчанию
 
         primaryStage.setTitle("Редактор 3D моделей"); // заголовок окна
         primaryStage.setScene(scene); // устанавливаем сцену в окно
         primaryStage.show(); // показываем окно
+
+        scene.addEventHandler(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.DELETE) {
+                deleteSelected();
+                event.consume();
+            }
+        });
     }
 
     private MenuBar createMenuBar() { // создает строку меню
@@ -63,16 +82,28 @@ public class MainApplication extends Application {
 
         Menu editMenu = new Menu("Редактировать");
         CheckMenuItem editModeItem = new CheckMenuItem("Режим редактирования");
+        editModeItem.setAccelerator(KeyCombination.keyCombination("Ctrl+E"));
+        editModeItem.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            setEditMode(newVal);
+        });
         MenuItem deleteItem = new MenuItem("Удалить выделенное");
         deleteItem.setOnAction(e -> deleteSelected()); // обработчик удаления
+        MenuItem deleteVertexItem = new MenuItem("Удалить вершину");
+        MenuItem deletePolygonItem = new MenuItem("Удалить полигон");
+        deleteVertexItem.setOnAction(e -> deleteSelectedVertex());
+        deletePolygonItem.setOnAction(e -> deleteSelectedPolygon());
 
-        editMenu.getItems().addAll(editModeItem, new SeparatorMenuItem(), deleteItem); // собираем меню редактирования
+        editMenu.getItems().addAll(editModeItem, new SeparatorMenuItem(),
+                deleteVertexItem, deletePolygonItem, new SeparatorMenuItem(), deleteItem);// собираем меню редактирования
 
         Menu viewMenu = new Menu("Вид");
         CheckMenuItem showWireframe = new CheckMenuItem("Показать каркас");
         CheckMenuItem showVertices = new CheckMenuItem("Показать вершины");
         MenuItem darkThemeItem = new MenuItem("Тёмная тема");
         MenuItem lightThemeItem = new MenuItem("Светлая тема");
+
+        darkThemeItem.setOnAction(e -> switchTheme("dark"));
+        lightThemeItem.setOnAction(e -> switchTheme("light"));
 
         viewMenu.getItems().addAll(showWireframe, showVertices, new SeparatorMenuItem(),
                 darkThemeItem, lightThemeItem); // собираем меню вида
@@ -208,13 +239,24 @@ public class MainApplication extends Application {
         return hbox; // возвращаем готовый контрол
     }
 
-    private HBox createStatusBar() { // создает строку состояния
-        HBox statusBar = new HBox(10); // горизонтальный контейнер
+    private HBox createStatusBar() {
+        HBox statusBar = new HBox(10);
         statusBar.getStyleClass().add("status-bar");
-        statusBar.setPadding(new Insets(5)); // небольшие отступы
+        statusBar.setPadding(new Insets(5));
 
         Label statusLabel = new Label("Готово");
         statusLabel.setId("status-label");
+
+        Label editModeLabel = new Label("[Режим редактирования: ВЫКЛ]");
+        editModeLabel.setId("edit-mode-label");
+        editModeLabel.setTextFill(Color.GRAY);
+
+        editManager.setEditModeListener(enabled -> {// обновляем метку при изменении режима
+            editModeLabel.setText(enabled ?
+                    "[Режим редактирования: ВКЛ]" :
+                    "[Режим редактирования: ВЫКЛ]");
+            editModeLabel.setTextFill(enabled ? Color.RED : Color.GRAY);
+        });
 
         Label vertexCountLabel = new Label("Вершин: 0");
         vertexCountLabel.setId("vertex-count");
@@ -222,9 +264,9 @@ public class MainApplication extends Application {
         Label polygonCountLabel = new Label("Полигонов: 0");
         polygonCountLabel.setId("polygon-count");
 
-        statusBar.getChildren().addAll(statusLabel, new Separator(), // собираем элементы
-                vertexCountLabel, polygonCountLabel); // счетчики вершин и полигонов
-        return statusBar; // возвращаем строку состояния
+        statusBar.getChildren().addAll(statusLabel, editModeLabel, new Separator(),
+                vertexCountLabel, polygonCountLabel);
+        return statusBar;
     }
 
     private void updateModelPropertiesPanel(Model3D model) { // обновляет панель свойств для выбранной модели
@@ -280,11 +322,9 @@ public class MainApplication extends Application {
                                 loadedModel.getPolygonCount())); // количество полигонов
 
             } catch (IOException e) {
-                DialogHelper.showErrorDialog("Ошибка загрузки",
-                        "Не удалось загрузить модель: " + e.getMessage());
+                ErrorHandler.handleException(e, "загрузка OBJ файла");
             } catch (Exception e) {
-                DialogHelper.showErrorDialog("Ошибка",
-                        "Непредвиденная ошибка: " + e.getMessage());
+                ErrorHandler.handleException(e, "непредвиденная ошибка при загрузке");
             }
         }
     }
@@ -296,15 +336,31 @@ public class MainApplication extends Application {
             fileChooser.getExtensionFilters().add(
                     new FileChooser.ExtensionFilter("OBJ Files", "*.obj"));
             fileChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+            fileChooser.setInitialFileName(activeModel.getName() + ".obj");
             File file = fileChooser.showSaveDialog(primaryStage); // показываем диалог сохранения
 
             if (file != null) {
-                DialogHelper.showInfoDialog("Сохранение модели", // заглушка - сохранение не реализовано
-                        "ObjWriter будет реализован позже. Файл: " + file.getName());
+                try {
+                    boolean applyTransformations = DialogHelper.showSaveOptionsDialog();// спрашиваем пользователя, как сохранять
+
+                    ObjWriter objWriter = new ObjWriter();// создаём и используем ObjWriter
+                    objWriter.writeModel(activeModel, file.getAbsolutePath(), applyTransformations);
+
+                    DialogHelper.showInfoDialog("Сохранение завершено",
+                            String.format("Модель успешно сохранена!\nФайл: %s\nВершин: %d\nПолигонов: %d\nТрансформации применены: %s",
+                                    file.getName(),
+                                    activeModel.getVertices().size(),
+                                    activeModel.getPolygons().size(),
+                                    applyTransformations ? "Да" : "Нет"));
+
+                } catch (IOException e) {
+                    ErrorHandler.handleException(e, "сохранение модели");
+                } catch (Exception e) {
+                    ErrorHandler.handleException(e, "непредвиденная ошибка при сохранении");
+                }
             }
         } else { // если нет активной модели
-            DialogHelper.showWarningDialog("Модель не выбрана",
-                    "Пожалуйста, выберите модель для сохранения.");
+            ErrorHandler.handleWarning("Модель не выбрана", "сохранение");
         }
     }
 
@@ -321,11 +377,83 @@ public class MainApplication extends Application {
         }
     }
 
-    private void deleteSelected() { // удаление вершин/полигонов (заглушка)
-        Model3D activeModel = selectionManager.getActiveModel(); // получаем активную модель
-        if (activeModel != null) { // если есть активная модель
-            DialogHelper.showInfoDialog("Удаление", //заглушка
-                    "Удаление вершин/полигонов будет реализовано позже.");
+    private void setEditMode(boolean enabled) {// метод для установки режима редактирования
+        editManager.setEditMode(enabled);
+        if (enabled) {
+            DialogHelper.showInfoDialog("Режим редактирования",
+                    "Режим редактирования включен.\n" +
+                            "1. Включите 3D-вид (когда будет готов)\n" +
+                            "2. Кликните на вершину/полигон для выбора\n" +
+                            "3. Удалите через меню или клавишу Delete");
+        }
+    }
+
+    private void deleteSelectedVertex() { // методы удаления
+        Model3D activeModel = selectionManager.getActiveModel();
+        if (activeModel != null && editManager.isEditMode()) {
+            if (editManager.getSelectedVertexIndex() != -1) {
+                editManager.deleteSelectedVertex(activeModel);
+                updateModelPropertiesPanel(activeModel);
+                DialogHelper.showInfoDialog("Успех", "Вершина удалена");
+            } else {
+                DialogHelper.showWarningDialog("Внимание", "Выберите вершину для удаления");
+            }
+        }
+    }
+
+    private void deleteSelectedPolygon() {
+        Model3D activeModel = selectionManager.getActiveModel();
+        if (activeModel != null && editManager.isEditMode()) {
+            if (editManager.getSelectedPolygonIndex() != -1) {
+                editManager.deleteSelectedPolygon(activeModel);
+                updateModelPropertiesPanel(activeModel);
+                DialogHelper.showInfoDialog("Успех", "Полигон удалена");
+            } else {
+                DialogHelper.showWarningDialog("Внимание", "Выберите полигон для удаления");
+            }
+        }
+    }
+
+    private void deleteSelected() {
+        if (editManager.isEditMode()) {
+            if (editManager.getSelectedVertexIndex() != -1) {// в режиме редактирования удаляем выбранный элемент
+                deleteSelectedVertex();
+            } else if (editManager.getSelectedPolygonIndex() != -1) {
+                deleteSelectedPolygon();
+            }
+        } else {
+            ModelWrapper selected = modelListView.getSelectionModel().getSelectedItem();// в обычном режиме удаляем модель
+            if (selected != null) {
+                sceneManager.removeModelWrapper(selected);
+            }
+        }
+    }
+
+    private void switchTheme(String theme) {// метод переключения темы
+        try {
+            Scene scene = primaryStage.getScene();
+            if (scene == null) return;
+
+            scene.getStylesheets().clear();
+
+            if (theme.equals("dark")) {
+                URL cssUrl = getClass().getResource("/dark.css");
+                if (cssUrl != null) {
+                    scene.getStylesheets().add(cssUrl.toExternalForm());
+                    currentTheme = "dark";
+                    System.out.println("Тёмная тема активирована");
+                }
+            } else {
+                URL cssUrl = getClass().getResource("/light.css");
+                if (cssUrl != null) {
+                    scene.getStylesheets().add(cssUrl.toExternalForm());
+                    currentTheme = "light";
+                    System.out.println("Светлая тема активирована");
+                }
+            }
+
+        } catch (Exception e) {
+            System.err.println("Ошибка переключения темы: " + e.getMessage());
         }
     }
 

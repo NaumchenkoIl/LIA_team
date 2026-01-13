@@ -1,27 +1,41 @@
 package scene_master.util;
 
-import javafx.scene.control.Alert; // диалоговое окно
+import javafx.scene.control.Alert;
+import javafx.scene.control.ChoiceDialog;
+import javafx.application.Platform;
+
+import java.util.Optional;
 
 public class DialogHelper {
 
     public static void showErrorDialog(String title, String message) { // показать диалог ошибки
-        showDialog(Alert.AlertType.ERROR, title, message); // вызываем общий метод с типом ERROR
+        ErrorHandler.handleWarning(message, title);
     }
 
     public static void showWarningDialog(String title, String message) { // показать диалог предупреждения
-        showDialog(Alert.AlertType.WARNING, title, message); // вызываем общий метод с типом WARNING
+        ErrorHandler.handleWarning(message, title);
     }
 
     public static void showInfoDialog(String title, String message) { // показать информационный диалог
-        showDialog(Alert.AlertType.INFORMATION, title, message); // вызываем общий метод с типом INFORMATION
+        ErrorHandler.logInfo(message, title);
+
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        });
     }
 
-    private static void showDialog(Alert.AlertType type, String title, String message) { // общий метод создания диалога
-        Alert alert = new Alert(type); // создаем диалог указанного типа
-        alert.setTitle(title); // устанавливаем заголовок
-        alert.setHeaderText(null); // убираем дополнительный заголовок
-        alert.setContentText(message); // устанавливаем текст сообщения
-        alert.showAndWait(); // показываем диалог и ждем закрытия
+    public static boolean showSaveOptionsDialog() {
+        ChoiceDialog<String> dialog = new ChoiceDialog<>("Исходная модель", "Исходная модель", "Модель с трансформациями");
+        dialog.setTitle("Параметры сохранения");
+        dialog.setHeaderText("Как сохранить модель?");
+        dialog.setContentText("Выберите вариант:");
+
+        Optional<String> result = dialog.showAndWait();
+        return result.isPresent() && result.get().equals("Модель с трансформациями");
     }
 }
 
