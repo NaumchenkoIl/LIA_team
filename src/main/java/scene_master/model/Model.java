@@ -6,6 +6,8 @@ import java.util.List;
 public class Model {
     private final List<Vector3D> vertices = new ArrayList();
     private final List<Polygon> polygons = new ArrayList();
+    private final List<Vector3D> textureVertices = new ArrayList<>();
+    private final List<Vector3D> normals = new ArrayList<>();
 
     public Model() {
     }
@@ -33,4 +35,10 @@ public class Model {
     public int getPolygonCount() {
         return this.polygons.size();
     }
+
+    public void addTextureVertex(Vector3D vt) { textureVertices.add(vt); }
+    public void addNormal(Vector3D vn) { normals.add(vn); }
+
+    public List<Vector3D> getTextureVertices() { return textureVertices; }
+    public List<Vector3D> getNormals() { return normals; }
 }

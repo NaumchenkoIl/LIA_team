@@ -3,12 +3,14 @@ package scene_master;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.scene.image.Image;
+import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import scene_master.calculator.NormalCalculator;
 import scene_master.manager.SceneManager; // менеджер сцены с моделями
 import scene_master.manager.SelectionManager; // менеджер выделения моделей
 import scene_master.model.*;
 import scene_master.reader.ObjReader; // загрузчик obj-файлов
+import scene_master.renderer.TextureManager;
 import scene_master.util.DialogHelper; // помощник для диалоговых окон
 import javafx.application.Application; // базовый класс javaFX приложения
 import javafx.geometry.Insets; // отступы для интерфейса
@@ -19,10 +21,12 @@ import javafx.stage.FileChooser; // диалог выбора файлов
 import javafx.stage.Stage; // главное окно приложения
 import scene_master.util.TextureLoader;
 import scene_master.renderer.RenderPanel;
+import scene_master.writer.ObjWriter;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class MainApplication extends Application {
@@ -90,6 +94,7 @@ public class MainApplication extends Application {
         CheckMenuItem useTextureItem = new CheckMenuItem("Использовать текстуру");
         MenuItem darkThemeItem = new MenuItem("Тёмная тема");
         MenuItem lightThemeItem = new MenuItem("Светлая тема");
+        CheckMenuItem useLightingItem = new CheckMenuItem("Использовать освещение");
 
         // Обработчики для флажков рендеринга
         showWireframe.setOnAction(e -> {
@@ -104,7 +109,21 @@ public class MainApplication extends Application {
             }
         });
 
-        viewMenu.getItems().addAll(showWireframe,  useTextureItem,
+        useLightingItem.setSelected(true); // По умолчанию включено
+        useLightingItem.setOnAction(e -> {
+            if (renderPanel != null) {
+                renderPanel.setUseLighting(useLightingItem.isSelected());
+                System.out.println("Освещение: " + (useLightingItem.isSelected() ? "ВКЛ" : "ВЫКЛ"));
+            }
+        });
+
+
+        // Разделитель для режимов рендеринга
+        SeparatorMenuItem renderModesSeparator = new SeparatorMenuItem();
+        SeparatorMenuItem themeSeparator = new SeparatorMenuItem();
+
+        viewMenu.getItems().addAll(showWireframe,  useTextureItem, useLightingItem,
+                renderModesSeparator, themeSeparator,
                 new SeparatorMenuItem(), showVertices, new SeparatorMenuItem(),
                 darkThemeItem, lightThemeItem); // собираем меню вида
 
@@ -158,40 +177,23 @@ public class MainApplication extends Application {
 
         Button addTestModelBtn = new Button("Добавить тестовую модель");
         Button removeModelBtn = new Button("Удалить модель");
-        Button rotateModelBtn = new Button("Вращать модель");
 
-        addTestModelBtn.setOnAction(e -> addTestModel()); // обработчик добавления
+
+        // В метод createLeftPanel() добавьте:
+        Button testLightingBtn = new Button("Тест освещения");
+        testLightingBtn.setOnAction(e -> debugLighting());
+
+        Button testNormalDirectionBtn = new Button("Тест нормалей");
+        testNormalDirectionBtn.setOnAction(e -> debugBackfaceIssue());
+
+        Button testNormalsBtn = new Button("Тест нормалей 2");
+        testNormalsBtn.setOnAction(e -> testNormals());
+
+        addTestModelBtn.setOnAction(e -> addTestModel());
+// И добавьте в HBox modelButtons:
         removeModelBtn.setOnAction(e -> removeSelectedModel()); // обработчик удаления
 
-        rotateModelBtn.setOnAction(e -> {
-            Model3D activeModel = selectionManager.getActiveModel();
-            if (activeModel != null) {
-                System.out.println("Вращение модели: " + activeModel.getName());
-                System.out.println("Текущий угол Y: " + activeModel.rotateYProperty().get());
-
-                // Вращаем на 15 градусов по Y
-                double current = activeModel.rotateYProperty().get();
-                activeModel.rotateYProperty().set(current + 15);
-
-                System.out.println("Новый угол Y: " + activeModel.rotateYProperty().get());
-
-                // Пересчитываем нормали (обязательно после вращения!)
-                activeModel.calculateNormals();
-
-                // Принудительно обновляем рендер
-                updateRender();
-
-                // Обновляем панель свойств
-                updateModelPropertiesPanel(activeModel);
-
-                System.out.println("Вращение выполнено");
-            } else {
-                DialogHelper.showWarningDialog("Нет выбранной модели",
-                        "Выберите модель для вращения из списка слева.");
-            }
-        });
-
-        HBox modelButtons = new HBox(5, addTestModelBtn, removeModelBtn, rotateModelBtn); // горизонтальный контейнер для кнопок
+        HBox modelButtons = new HBox(5, addTestModelBtn, removeModelBtn, testLightingBtn, testNormalDirectionBtn, testNormalsBtn); // горизонтальный контейнер для кнопок
 
         leftPanel.getChildren().addAll(modelsLabel, modelListView, modelButtons); // собираем все элементы панели
         return leftPanel; // возвращаем готовую панель
@@ -223,16 +225,6 @@ public class MainApplication extends Application {
         renderPanel.setStyle("-fx-background-color: #1a1a2e;");
 
         // Добавляем обработку клавиш для управления камерой
-        renderPanel.setOnKeyPressed(event -> {
-            switch (event.getCode()) {
-                case W: renderPanel.moveCameraForward(); break;
-                case S: renderPanel.moveCameraBackward(); break;
-                case A: renderPanel.moveCameraLeft(); break;
-                case D: renderPanel.moveCameraRight(); break;
-                case Q: renderPanel.rotateCameraLeft(); break;
-                case E: renderPanel.rotateCameraRight(); break;
-            }
-        });
 
         renderPanel.setFocusTraversable(true);
         // Привязка моделей из sceneManager к рендереру
@@ -247,26 +239,35 @@ public class MainApplication extends Application {
         return renderPanel;
     }
 
-    private VBox createRightPanel() { // создает правую панель свойств
-        VBox rightPanel = new VBox(10); // вертикальный контейнер
+    private VBox createRightPanel() {
+        VBox rightPanel = new VBox(10);
         rightPanel.getStyleClass().add("right-panel");
-        rightPanel.setPadding(new Insets(10)); // отступы
-        rightPanel.setPrefWidth(300); //  ширина 300px
+        rightPanel.setPadding(new Insets(10));
+        rightPanel.setPrefWidth(300);
 
         Label propertiesLabel = new Label("Свойства модели");
         propertiesLabel.getStyleClass().add("section-label");
 
-        modelPropertiesPanel = new BorderPane(); // контейнер для свойств (пока пустой)
-        modelPropertiesPanel.setCenter(new Label("Select a model to edit properties")); // инструкция
+        // Инициализируем modelPropertiesPanel только один раз
+        if (modelPropertiesPanel == null) {
+            modelPropertiesPanel = new BorderPane();
+            modelPropertiesPanel.setCenter(new Label("Выберите модель для редактирования свойств"));
+        }
 
         Label transformLabel = new Label("Трансформации");
         transformLabel.getStyleClass().add("section-label");
 
-        VBox transformsPanel = createTransformsPanel(); // создаем панель с ползунками трансформаций
+        VBox transformsPanel = createTransformsPanel();
 
-        rightPanel.getChildren().addAll(propertiesLabel, modelPropertiesPanel, // собираем все элементы
-                new Separator(), transformLabel, transformsPanel); // разделитель и трансформации
-        return rightPanel; // возвращаем готовую панель
+        rightPanel.getChildren().addAll(
+                propertiesLabel,
+                modelPropertiesPanel,
+                new Separator(),
+                transformLabel,
+                transformsPanel
+        );
+
+        return rightPanel;
     }
 
     private VBox createTransformsPanel() { // создает панель с ползунками для трансформаций
@@ -324,55 +325,165 @@ public class MainApplication extends Application {
         return statusBar; // возвращаем строку состояния
     }
 
-    private void updateModelPropertiesPanel(Model3D model) { // обновляет панель свойств для выбранной модели
-        VBox properties = new VBox(10); // вертикальный контейнер для свойств
+    private void updateModelPropertiesPanel(Model3D model) {
+        if (modelPropertiesPanel == null) return;
 
-        HBox nameBox = new HBox(10); // контейнер для имени
+        // Очищаем старые элементы перед добавлением новых
+        if (modelPropertiesPanel.getCenter() instanceof VBox) {
+            VBox oldProperties = (VBox) modelPropertiesPanel.getCenter();
+            oldProperties.getChildren().clear();
+        }
+
+        VBox properties = new VBox(10);
+
+        // === Секция имени ===
+        HBox nameBox = new HBox(10);
         Label nameLabel = new Label("Имя:");
-        TextField nameField = new TextField(model.nameProperty().get()); // поле ввода имени
-        nameField.textProperty().bindBidirectional(model.nameProperty()); // двусторонняя привязка к свойству модели
-        nameBox.getChildren().addAll(nameLabel, nameField); // собираем
+        TextField nameField = new TextField(model.nameProperty().get());
+        nameField.textProperty().bindBidirectional(model.nameProperty());
+        nameBox.getChildren().addAll(nameLabel, nameField);
 
+        // === Секция видимости ===
         CheckBox visibleCheck = new CheckBox("Видима");
-        visibleCheck.selectedProperty().bindBidirectional(model.visibleProperty()); // привязка к свойству видимости
+        visibleCheck.selectedProperty().bindBidirectional(model.visibleProperty());
 
-        HBox colorBox = new HBox(10); // контейнер для выбора цвета
+        // === Секция цвета ===
+        HBox colorBox = new HBox(10);
         Label colorLabel = new Label("Цвет:");
-        javafx.scene.paint.Color fxColor = javafx.scene.paint.Color.LIGHTBLUE; // цвет по умолчанию
-        ColorPicker colorPicker = new ColorPicker(model.getBaseColor()); // виджет выбора цвета
+        ColorPicker colorPicker = new ColorPicker(model.getBaseColor());
         colorPicker.valueProperty().bindBidirectional(model.baseColorProperty());
-        colorBox.getChildren().addAll(colorLabel, colorPicker); // собираем
+        colorBox.getChildren().addAll(colorLabel, colorPicker);
 
-        // Текстура
+        // === Секция текстуры ===
+        Label textureSection = new Label("Текстура:");
+        textureSection.getStyleClass().add("subsection-label");
+
         HBox textureBox = new HBox(10);
-        Label textureLabel = new Label("Текстура:");
         Button loadTextureBtn = new Button("Загрузить...");
         Button clearTextureBtn = new Button("Очистить");
 
-        // Показываем имя файла текстуры
-        Label textureInfo = new Label(model.getTexture() == null ? "Нет текстуры" : "Текстура загружена");
+        Label textureStatus = new Label(
+                model.getTexture() != null ? "✓ Текстура загружена" : "Нет текстуры"
+        );
 
         loadTextureBtn.setOnAction(e -> loadTextureForModel(model));
         clearTextureBtn.setOnAction(e -> {
             model.setTexture(null);
-            textureInfo.setText("Нет текстуры");
+            textureStatus.setText("Нет текстуры");
+            updateRender();
         });
 
-        // Слушатель изменения текстуры
-        model.textureProperty().addListener((obs, oldTex, newTex) -> {
-            textureInfo.setText(newTex == null ? "Нет текстуры" : "Текстура загружена");
-        });
+        textureBox.getChildren().addAll(loadTextureBtn, clearTextureBtn, textureStatus);
 
-        textureBox.getChildren().addAll(textureLabel, loadTextureBtn, clearTextureBtn, textureInfo);
-
-        Label statsLabel = new Label(String.format( // метка со статистикой
-                "Статистика: Вершин: %d || Полигонов: %d",
-                model.getVertices().size(), // количество вершин
-                model.getPolygons().size() // количество полигонов
+        // === Секция статистики ===
+        Label statsLabel = new Label(String.format(
+                "Статистика: Вершин: %d | Полигонов: %d | UV-координат: %d",
+                model.getVertices().size(),
+                model.getPolygons().size(),
+                model.getTextureCoords().size()
         ));
 
-        properties.getChildren().addAll(nameBox, visibleCheck, colorBox, textureBox, statsLabel); // собираем все свойства
-        modelPropertiesPanel.setCenter(properties); // устанавливаем свойства в центр панели
+        // === Секция трансформаций ===
+        Label transformSection = new Label("Текущие трансформации:");
+        transformSection.getStyleClass().add("subsection-label");
+
+        VBox transformsInfo = new VBox(5);
+
+        HBox translateInfo = new HBox(10);
+        translateInfo.getChildren().addAll(
+                new Label("Перемещение:"),
+                new Label(String.format("X: %.1f", model.translateXProperty().get())),
+                new Label(String.format("Y: %.1f", model.translateYProperty().get())),
+                new Label(String.format("Z: %.1f", model.translateZProperty().get()))
+        );
+
+        HBox rotateInfo = new HBox(10);
+        rotateInfo.getChildren().addAll(
+                new Label("Вращение:"),
+                new Label(String.format("X: %.1f°", model.rotateXProperty().get())),
+                new Label(String.format("Y: %.1f°", model.rotateYProperty().get())),
+                new Label(String.format("Z: %.1f°", model.rotateZProperty().get()))
+        );
+
+        HBox scaleInfo = new HBox(10);
+        scaleInfo.getChildren().addAll(
+                new Label("Масштаб:"),
+                new Label(String.format("X: %.1f", model.scaleXProperty().get())),
+                new Label(String.format("Y: %.1f", model.scaleYProperty().get())),
+                new Label(String.format("Z: %.1f", model.scaleZProperty().get()))
+        );
+
+        transformsInfo.getChildren().addAll(translateInfo, rotateInfo, scaleInfo);
+
+        // === Кнопки управления ===
+        HBox actionButtons = new HBox(10);
+        Button resetTransformBtn = new Button("Сбросить трансформации");
+        Button centerModelBtn = new Button("Центрировать");
+
+        resetTransformBtn.setOnAction(e -> {
+            model.translateXProperty().set(0);
+            model.translateYProperty().set(0);
+            model.translateZProperty().set(0);
+            model.rotateXProperty().set(0);
+            model.rotateYProperty().set(0);
+            model.rotateZProperty().set(0);
+            model.scaleXProperty().set(1);
+            model.scaleYProperty().set(1);
+            model.scaleZProperty().set(1);
+           // model.calculateNormals();
+            model.calculateVertexNormals();
+            updateRender();
+            updateModelPropertiesPanel(model); // Обновляем панель
+        });
+
+        centerModelBtn.setOnAction(e -> {
+            // Просто сбрасываем перемещение
+            model.translateXProperty().set(0);
+            model.translateYProperty().set(0);
+            model.translateZProperty().set(0);
+            updateRender();
+            updateModelPropertiesPanel(model);
+        });
+
+        actionButtons.getChildren().addAll(resetTransformBtn, centerModelBtn);
+
+        // === Собираем все элементы ===
+        properties.getChildren().addAll(
+                nameBox,
+                visibleCheck,
+                colorBox,
+                new Separator(),
+                textureSection,
+                textureBox,
+                new Separator(),
+                statsLabel,
+                new Separator(),
+                transformSection,
+                transformsInfo,
+                new Separator(),
+                actionButtons
+        );
+
+        // Устанавливаем новую панель свойств
+        modelPropertiesPanel.setCenter(properties);
+
+        // Добавляем слушатели для обновления трансформаций в реальном времени
+        model.translateXProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.translateYProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.translateZProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.rotateXProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.rotateYProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.rotateZProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.scaleXProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.scaleYProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+        model.scaleZProperty().addListener((obs, oldVal, newVal) -> updateTransformsInfo(model));
+    }
+
+    // Вспомогательный метод для обновления информации о трансформациях
+    private void updateTransformsInfo(Model3D model) {
+        // Этот метод будет вызываться при изменении трансформаций
+        // Пока просто обновляем рендер
+        updateRender();
     }
 
     private void openModel() { // открытие модели из файла
@@ -412,7 +523,6 @@ public class MainApplication extends Application {
     private void saveModel() {
         Model3D activeModel = selectionManager.getActiveModel();
         if (activeModel != null) {
-            // Найти соответствующий wrapper
             ModelWrapper selectedWrapper = null;
             for (ModelWrapper wrapper : sceneManager.getModelWrappers()) {
                 if (wrapper.getUIModel() == activeModel) {
@@ -420,64 +530,51 @@ public class MainApplication extends Application {
                     break;
                 }
             }
-
+            if (activeModel.getVertices().isEmpty()) {
+                DialogHelper.showErrorDialog("Ошибка сохранения",
+                        "Модель пуста — не содержит ни одной вершины. Невозможно сохранить.");
+                return;
+            }
             if (selectedWrapper != null) {
-                // Спросить пользователя: сохранить с трансформациями или без?
                 Alert transformDialog = new Alert(Alert.AlertType.CONFIRMATION);
                 transformDialog.setTitle("Сохранение модели");
                 transformDialog.setHeaderText("Сохранить трансформации?");
-                transformDialog.setContentText("Сохранить модель с текущими трансформациями (перемещение, вращение, масштаб)?" +
-                        "\n'Да' - сохранить как видите\n'Нет' - сохранить оригинальную модель");
-
+                transformDialog.setContentText("Сохранить модель с текущими трансформациями?\n'Да' — сохранить как видите\n'Нет' — сохранить оригинальную модель");
                 ButtonType yesButton = new ButtonType("Да", ButtonBar.ButtonData.YES);
                 ButtonType noButton = new ButtonType("Нет", ButtonBar.ButtonData.NO);
                 ButtonType cancelButton = new ButtonType("Отмена", ButtonBar.ButtonData.CANCEL_CLOSE);
-
                 transformDialog.getButtonTypes().setAll(yesButton, noButton, cancelButton);
 
                 java.util.Optional<ButtonType> result = transformDialog.showAndWait();
-
                 if (result.isPresent()) {
                     if (result.get() == yesButton) {
-                        // Применить трансформации
                         applyTransformationsToOriginalModel(selectedWrapper);
                         selectedWrapper.updateUIModel();
                     } else if (result.get() == noButton) {
-                        // Просто сохранить оригинальную модель
-                        // Ничего не делаем, оригинальная модель уже в исходном состоянии
+                        // Оставляем оригинальную модель без изменений
                     } else {
-                        // Отмена
                         return;
                     }
 
-                    // Продолжаем с диалогом сохранения файла
                     FileChooser fileChooser = new FileChooser();
-                    fileChooser.getExtensionFilters().add(
-                            new FileChooser.ExtensionFilter("OBJ Files", "*.obj"));
+                    fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("OBJ Files", "*.obj"));
                     fileChooser.setInitialDirectory(new File(System.getProperty("user.home")));
                     File file = fileChooser.showSaveDialog(primaryStage);
-
                     if (file != null) {
                         try {
-                            // Здесь будет вызов ObjWriter (когда он будет реализован)
-                            // ObjWriter.saveModel(selectedWrapper.getOriginalModel(), file.getPath());
-
-                            DialogHelper.showInfoDialog("Сохранение модели",
-                                    String.format("Модель сохранена в файл: %s\n" +
-                                                    "Вершин: %d, Полигонов: %d",
-                                            file.getName(),
-                                            selectedWrapper.getOriginalModel().getVertexCount(),
-                                            selectedWrapper.getOriginalModel().getPolygonCount()));
+                            // 🔥 Подключаем твой ObjWriter!
+                            ObjWriter.write(selectedWrapper.getOriginalModel(), file.getPath());
+                            DialogHelper.showInfoDialog("Успешно",
+                                    "Модель сохранена!\nВершин: " + selectedWrapper.getOriginalModel().getVertexCount() +
+                                            "\nПолигонов: " + selectedWrapper.getOriginalModel().getPolygonCount());
                         } catch (Exception e) {
-                            DialogHelper.showErrorDialog("Ошибка сохранения",
-                                    "Не удалось сохранить модель: " + e.getMessage());
+                            DialogHelper.showErrorDialog("Ошибка сохранения", e.getMessage());
                         }
                     }
                 }
             }
         } else {
-            DialogHelper.showWarningDialog("Модель не выбрана",
-                    "Пожалуйста, выберите модель для сохранения.");
+            DialogHelper.showWarningDialog("Модель не выбрана", "Выберите модель для сохранения.");
         }
     }
 
@@ -520,59 +617,46 @@ public class MainApplication extends Application {
     }
 
     private void addTestModel() {
-        try {
-            // Пробуем несколько возможных путей
-            String[] possiblePaths = {
-                    "test_cube.obj",                                    // Текущая директория
-                    "src/test/test_cube.obj",                           // Относительный путь
-                    "C:\\Users\\Александр\\Desktop\\for3person\\LIA_team\\src\\test\\test_cube.obj", // Абсолютный путь
-                    System.getProperty("user.dir") + "/src/test/test_cube.obj" // Динамический путь
-            };
+        Model cubeModel = new Model();
 
-            File file = null;
-            for (String path : possiblePaths) {
-                File testFile = new File(path);
-                if (testFile.exists()) {
-                    file = testFile;
-                    System.out.println("Файл найден: " + file.getAbsolutePath());
-                    break;
-                }
-            }
+        // Вершины куба (центр в 0,0,0, размер 1)
+        // ПЕРЕДНЯЯ грань (Z = -0.5)
+        cubeModel.addVertex(new Vector3D(-0.5, -0.5, -0.5)); // 0
+        cubeModel.addVertex(new Vector3D( 0.5, -0.5, -0.5)); // 1
+        cubeModel.addVertex(new Vector3D( 0.5,  0.5, -0.5)); // 2
+        cubeModel.addVertex(new Vector3D(-0.5,  0.5, -0.5)); // 3
 
-            if (file == null || !file.exists()) {
-                // Создаем тестовый куб в памяти
-              //  createTestCubeInMemory();
-                return;
-            }
+        // ЗАДНЯЯ грань (Z = 0.5)
+        cubeModel.addVertex(new Vector3D(-0.5, -0.5,  0.5)); // 4
+        cubeModel.addVertex(new Vector3D( 0.5, -0.5,  0.5)); // 5
+        cubeModel.addVertex(new Vector3D( 0.5,  0.5,  0.5)); // 6
+        cubeModel.addVertex(new Vector3D(-0.5,  0.5,  0.5)); // 7
 
-            // Загружаем модель через ObjReader
-            ObjReader objReader = new ObjReader();
-            scene_master.model.Model loadedModel = objReader.readModel(file.getAbsolutePath());
+        // Грани (вершины в порядке ПРОТИВ часовой стрелки)
+        // Передняя грань
+        cubeModel.addPolygon(new Polygon(0, 1, 2, 3));
+        // Задняя грань
+        cubeModel.addPolygon(new Polygon(7, 6, 5, 4));
+        // Верхняя грань
+        cubeModel.addPolygon(new Polygon(3, 2, 6, 7));
+        // Нижняя грань
+        cubeModel.addPolygon(new Polygon(4, 5, 1, 0));
+        // Левая грань
+        cubeModel.addPolygon(new Polygon(4, 0, 3, 7));
+        // Правая грань
+        cubeModel.addPolygon(new Polygon(1, 5, 6, 2));
 
-            // Создаем обертку
-            ModelWrapper modelWrapper = new ModelWrapper(
-                    loadedModel,
-                    "Test Cube"
-            );
+        ModelWrapper wrapper = new ModelWrapper(cubeModel, "Fixed Cube");
+        sceneManager.addModelWrapper(wrapper);
 
-            // Добавляем на сцену
-            sceneManager.addModelWrapper(modelWrapper);
+        // Вычисляем нормали
+        wrapper.getUIModel().calculateNormals();
+        wrapper.getUIModel().calculateVertexNormals();
 
-            // Устанавливаем цвет и немного вращаем для лучшего вида
-            modelWrapper.getUIModel().setBaseColor(javafx.scene.paint.Color.CYAN);
-            modelWrapper.getUIModel().rotateYProperty().set(20);
-            modelWrapper.getUIModel().calculateNormals();
-
-            updateRender();
-
-        } catch (IOException e) {
-            // Если не удалось загрузить файл, создаем модель программно
-            DialogHelper.showWarningDialog("Файл не найден",
-                    "Создаем тестовый куб в памяти.\n" + e.getMessage());
-            //createTestCubeInMemory();
-        }
+        updateRender();
     }
 
+    // Метод загрузки текстуры
     private void loadTextureForModel(Model3D model) {
         FileChooser fileChooser = new FileChooser();
         fileChooser.getExtensionFilters().addAll(
@@ -584,28 +668,41 @@ public class MainApplication extends Application {
 
         if (file != null) {
             try {
-                Image texture = TextureLoader.loadTexture(file);
+                System.out.println("Загрузка текстуры из: " + file.getAbsolutePath());
+
+                // Загружаем текстуру через TextureManager
+                Image texture = TextureManager.getInstance().loadTexture(file);
+                System.out.println("Текстура загружена: " +
+                        texture.getWidth() + "x" + texture.getHeight());
+
+                // Устанавливаем текстуру в модель
                 model.setTexture(texture);
 
-                // Если у модели нет координат текстуры, создаем простые
-                if (model.getTextureCoordinates().isEmpty() && !model.getVertices().isEmpty()) {
-                    // Простая UV-развертка: просто проецируем вершины на плоскость XY
-                    for (int i = 0; i < model.getVertices().size(); i++) {
-                        Vertex v = model.getVertices().get(i);
-                        // Простейшее отображение: x,y -> u,v
-                        double u = (v.x + 1) / 2; // [-1,1] -> [0,1]
-                        double vCoord = (v.y + 1) / 2;
-                        model.addTextureCoordinate(u, vCoord);
-                    }
+                // Проверяем и создаем UV-координаты если нужно
+                checkAndFixUVCoordinates(model);
+
+                // Включаем режим текстуры в рендерере
+                if (renderPanel != null) {
+                    renderPanel.setUseTexture(true);
                 }
 
+                // Обновляем рендер
+                updateRender();
+
                 DialogHelper.showInfoDialog("Текстура загружена",
-                        String.format("Текстура успешно загружена: %s\nРазмер: %.0fx%.0f",
-                                file.getName(), texture.getWidth(), texture.getHeight()));
+                        String.format("Текстура: %s\nРазмер: %dx%d\nUV-координат: %d",
+                                file.getName(),
+                                (int)texture.getWidth(),
+                                (int)texture.getHeight(),
+                                model.getTextureCoords().size()));
 
             } catch (IOException e) {
-                DialogHelper.showErrorDialog("Ошибка загрузки текстуры",
+                DialogHelper.showErrorDialog("Ошибка загрузки",
                         "Не удалось загрузить текстуру: " + e.getMessage());
+            } catch (Exception e) {
+                DialogHelper.showErrorDialog("Ошибка",
+                        "Непредвиденная ошибка: " + e.getMessage());
+                e.printStackTrace();
             }
         }
     }
@@ -635,5 +732,278 @@ public class MainApplication extends Application {
 
     public static void main(String[] args) { // точка входа для запуска (каоимагдная строка)
         launch(args); // запуск приложения
+    }
+
+    // В MainApplication.java добавьте:
+    private void checkAndFixUVCoordinates(Model3D model) {
+        System.out.println("=== Проверка UV-координат для модели: " + model.getName() + " ===");
+        System.out.println("Вершин: " + model.getVertices().size());
+        System.out.println("UV-координат: " + model.getTextureCoords().size());
+        System.out.println("Текстура: " + (model.getTexture() != null ? "Загружена" : "Нет"));
+
+        // Если UV-координат нет, создаем их
+        if (model.getTextureCoords().isEmpty()) {
+            System.out.println("Создаем UV-координаты...");
+            createSimpleUVCoordinates(model);
+        }
+
+        // Проверяем, привязаны ли UV к полигонам
+        int polygonsWithUV = 0;
+        for (Polygon polygon : model.getPolygons()) {
+            if (!polygon.getTextureIndices().isEmpty()) {
+                polygonsWithUV++;
+            }
+        }
+        System.out.println("Полигонов с UV: " + polygonsWithUV + " из " + model.getPolygons().size());
+
+        // Если UV не привязаны к полигонам, привязываем
+        if (polygonsWithUV == 0) {
+            System.out.println("Привязываем UV к полигонам...");
+            for (Polygon polygon : model.getPolygons()) {
+                List<Integer> vertexIndices = polygon.getVertexIndices();
+                for (int vertexIndex : vertexIndices) {
+                    if (vertexIndex < model.getTextureCoords().size()) {
+                        polygon.addTextureIndex(vertexIndex);
+                    }
+                }
+            }
+        }
+    }
+
+    private void createSimpleUVCoordinates(Model3D model) {
+        model.clearTextureCoords();
+
+        System.out.println("Создание ПРАВИЛЬНЫХ UV для куба...");
+
+        // Для куба с 8 вершинами - создаем 8 UV координат
+        // Каждая грань куба имеет 4 вершины, но вершины могут повторяться
+
+        if (model.getVertices().size() == 8) {
+            // UV координаты для КУБА (стандартные)
+            // Каждая вершина получает уникальную UV
+            float[][] cubeUVs = {
+                    {0.0f, 0.0f}, // 0: лево-низ-зад
+                    {1.0f, 0.0f}, // 1: право-низ-зад
+                    {1.0f, 1.0f}, // 2: право-верх-зад
+                    {0.0f, 1.0f}, // 3: лево-верх-зад
+                    {0.0f, 0.0f}, // 4: лево-низ-перед
+                    {1.0f, 0.0f}, // 5: право-низ-перед
+                    {1.0f, 1.0f}, // 6: право-верх-перед
+                    {0.0f, 1.0f}  // 7: лево-верх-перед
+            };
+
+            for (float[] uv : cubeUVs) {
+                model.addTextureCoord(uv[0], uv[1]);
+            }
+
+            System.out.println("Создано 8 UV-координат для куба");
+
+            // Теперь нужно ПРИВЯЗАТЬ UV к полигонам
+            // Для куба обычно 6 граней = 12 треугольников
+            // Каждому полигону нужно указать индексы UV
+
+            if (model.getPolygons().size() == 12) {
+                // Индексы UV для каждого полигона (триангулированного куба)
+                int[][] uvIndicesForCube = {
+                        {4,5,6}, {4,6,7}, // передняя грань
+                        {5,1,2}, {5,2,6}, // правая грань
+                        {1,0,3}, {1,3,2}, // задняя грань
+                        {0,4,7}, {0,7,3}, // левая грань
+                        {7,6,2}, {7,2,3}, // верхняя грань
+                        {0,1,5}, {0,5,4}  // нижняя грань
+                };
+
+                for (int i = 0; i < model.getPolygons().size() && i < uvIndicesForCube.length; i++) {
+                    Polygon polygon = model.getPolygons().get(i);
+                    polygon.getTextureIndices().clear(); // Очищаем старые
+
+                    for (int uvIdx : uvIndicesForCube[i]) {
+                        polygon.addTextureIndex(uvIdx);
+                    }
+                }
+                System.out.println("UV привязаны к полигонам");
+            }
+        } else {
+            // Для не-куба: простые UV
+            for (int i = 0; i < model.getVertices().size(); i++) {
+                double u = (i % 10) / 10.0;
+                double v = ((i / 10) % 10) / 10.0;
+                model.addTextureCoord(u, v);
+            }
+        }
+    }
+
+    private void debugLighting() {
+        System.out.println("=== Детальная диагностика освещения ===");
+
+        // Проверяем одну нормаль
+        Model3D model = sceneManager.getModelWrappers().get(0).getUIModel();
+        if (!model.getPolygons().isEmpty()) {
+            Polygon poly = model.getPolygons().get(0);
+            Vector3D normal = poly.getNormal();
+
+            if (normal != null) {
+                System.out.println("Нормаль первого полигона:");
+                System.out.println("  X: " + normal.getX());
+                System.out.println("  Y: " + normal.getY());
+                System.out.println("  Z: " + normal.getZ());
+
+                // Проверяем направление
+                System.out.println("  Z компонент: " + normal.getZ() +
+                        " (должен быть < 0 для граней, обращенных к камере)");
+
+                // Простой расчет dot product
+                double dot = normal.getX() * 0.5 + normal.getY() * (-0.5) + normal.getZ() * (-1);
+                System.out.println("  Dot с светом (0.5, -0.5, -1): " + dot);
+
+                if (dot < 0) {
+                    System.out.println("  ВНИМАНИЕ: dot < 0! Освещение будет темным.");
+                    System.out.println("  Решение: инвертировать нормали при Z > 0");
+                }
+            }
+        }
+
+        // Проверяем трансформации
+        System.out.println("\nТрансформации модели:");
+        System.out.println("  RotY: " + model.rotateYProperty().get());
+
+        // Рекомендации
+        System.out.println("\nРекомендации:");
+        System.out.println("  1. Проверить метод applyLightingToColor в SoftwareRenderer");
+        System.out.println("  2. Убедиться, что нормали инвертируются при Z > 0");
+        System.out.println("  3. Увеличить ambient свет до 0.4-0.5");
+    }
+
+    private void debugBackfaceIssue() {
+        for (ModelWrapper wrapper : sceneManager.getModelWrappers()) {
+            Model3D model = wrapper.getUIModel();
+
+            // Если UV-координат нет, создаем простые
+            if (model.getTextureCoords().isEmpty()) {
+                System.out.println("Создаем UV для модели: " + model.getName());
+
+                for (int i = 0; i < model.getVertices().size(); i++) {
+                    // Простая UV-развертка
+                    double u = Math.random(); // Временное решение
+                    double v = Math.random();
+                    model.addTextureCoord(u, v);
+                }
+            }
+
+            // Привязываем UV к полигонам
+            for (Polygon polygon : model.getPolygons()) {
+                List<Integer> vertexIndices = polygon.getVertexIndices();
+                polygon.getTextureIndices().clear();
+
+                for (int i = 0; i < vertexIndices.size(); i++) {
+                    polygon.addTextureIndex(vertexIndices.get(i));
+                }
+            }
+        }
+
+        updateRender();
+    }
+
+    private void testNormals() {
+        if (!sceneManager.getModelWrappers().isEmpty()) {
+            Model3D model = sceneManager.getModelWrappers().get(0).getUIModel();
+
+            System.out.println("=== ТЕСТ НОРМАЛЕЙ ===");
+            System.out.println("Вершин: " + model.getVertices().size());
+            System.out.println("Полигонов: " + model.getPolygons().size());
+
+            // Проверяем первые 5 нормалей
+            for (int i = 0; i < Math.min(5, model.getPolygons().size()); i++) {
+                Polygon poly = model.getPolygons().get(i);
+                Vector3D normal = poly.getNormal();
+
+                if (normal == null) {
+                    System.out.println(i + ": Нормаль = NULL");
+                } else {
+                    System.out.println(i + ": Нормаль = " + normal +
+                            ", Z = " + normal.getZ() +
+                            (normal.getZ() > 0 ? " ← ПРОБЛЕМА!" : " OK"));
+                }
+            }
+        }
+    }
+
+    private void createCubeUV(Model3D model) {
+        System.out.println("Создание UV-координат для куба...");
+        model.clearTextureCoords();
+
+        // Куб имеет 8 вершин, но для текстурирования нужно 24 UV-координаты
+        // (каждая вершина используется 3 раза с разными UV)
+
+        // Простая UV развертка куба
+        // Передняя грань
+        model.addTextureCoord(0.25, 0.75); // 0
+        model.addTextureCoord(0.50, 0.75); // 1
+        model.addTextureCoord(0.50, 0.50); // 2
+        model.addTextureCoord(0.25, 0.50); // 3
+
+        // Задняя грань
+        model.addTextureCoord(0.75, 0.75); // 4
+        model.addTextureCoord(1.00, 0.75); // 5
+        model.addTextureCoord(1.00, 0.50); // 6
+        model.addTextureCoord(0.75, 0.50); // 7
+
+        // Верхняя грань
+        model.addTextureCoord(0.25, 1.00); // 8
+        model.addTextureCoord(0.50, 1.00); // 9
+        model.addTextureCoord(0.50, 0.75); // 10
+        model.addTextureCoord(0.25, 0.75); // 11
+
+        // Нижняя грань
+        model.addTextureCoord(0.25, 0.50); // 12
+        model.addTextureCoord(0.50, 0.50); // 13
+        model.addTextureCoord(0.50, 0.25); // 14
+        model.addTextureCoord(0.25, 0.25); // 15
+
+        // Левая грань
+        model.addTextureCoord(0.00, 0.75); // 16
+        model.addTextureCoord(0.25, 0.75); // 17
+        model.addTextureCoord(0.25, 0.50); // 18
+        model.addTextureCoord(0.00, 0.50); // 19
+
+        // Правая грань
+        model.addTextureCoord(0.50, 0.75); // 20
+        model.addTextureCoord(0.75, 0.75); // 21
+        model.addTextureCoord(0.75, 0.50); // 22
+        model.addTextureCoord(0.50, 0.50); // 23
+
+        System.out.println("Создано " + model.getTextureCoords().size() + " UV-координат");
+    }
+
+    private void fixPolygonVertexOrder(Model3D model) {
+        System.out.println("\n=== ПРОСТОЙ ТЕСТ НОРМАЛЕЙ ===");
+
+        // Создаем простой треугольник вручную
+        Model3D testModel = new Model3D("Test Triangle");
+
+        // Треугольник, обращенный к камере
+        testModel.getVertices().add(new Vertex(0, 0, -1));  // ближе к камере
+        testModel.getVertices().add(new Vertex(1, 0, -1));
+        testModel.getVertices().add(new Vertex(0, 1, -1));
+
+        testModel.getPolygons().add(new Polygon(0, 1, 2));
+
+        // Вычисляем нормали
+        //testModel.calculateNormals();
+
+        // Проверяем
+        Polygon poly = testModel.getPolygons().get(0);
+        Vector3D normal = poly.getNormal();
+
+        System.out.println("Вершины треугольника:");
+        System.out.println("  V0: " + testModel.getVertices().get(0));
+        System.out.println("  V1: " + testModel.getVertices().get(1));
+        System.out.println("  V2: " + testModel.getVertices().get(2));
+        System.out.println("Нормаль: " + normal);
+        System.out.println("Z компонент: " + normal.getZ() + " (ожидается < 0)");
+
+        // Тест освещения
+        double dot = normal.getZ() * -1; // свет сзади
+        System.out.println("Dot с направлением (0,0,-1): " + dot);
     }
 }

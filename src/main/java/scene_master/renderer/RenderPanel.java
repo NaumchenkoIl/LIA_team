@@ -18,11 +18,6 @@ public class RenderPanel extends Pane {
     private boolean useTexture = false;
     private boolean useLighting = false;
 
-    private double cameraX = 0;
-    private double cameraY = 0;
-    private double cameraZ = 5;
-    private double cameraRotationY = 0;
-
     public RenderPanel(double width, double height) {
         canvas = new Canvas(width, height);
         getChildren().add(canvas);
@@ -34,6 +29,10 @@ public class RenderPanel extends Pane {
         // Инициализация рендерера
         renderer = new SoftwareRenderer(canvas);
 
+        // НАСТРОЙКА ОСВЕЩЕНИЯ ПО УМОЛЧАНИЮ
+        renderer.setAmbientLight(0.5);      // Увеличиваем ambient до 50%
+        renderer.setDiffuseIntensity(0.8);  // Увеличиваем diffuse до 80%
+        renderer.setLightDirection(0, -0.5, -1); // Оптимальное направление света
         // Обработка изменений размера
         this.widthProperty().addListener((obs, oldVal, newVal) -> {
             renderer.resize(newVal.intValue(), (int) canvas.getHeight());
@@ -69,7 +68,7 @@ public class RenderPanel extends Pane {
     public void render() {
         renderer.setRenderWireframe(renderWireframe);
         renderer.setUseTexture(useTexture);
-        renderer.setUseLighting(useLighting);
+        renderer.setUseLighting(useLighting); // Эта строка должна быть
         renderer.renderScene(models);
     }
 
@@ -83,8 +82,25 @@ public class RenderPanel extends Pane {
         render();
     }
 
+
     public void setUseLighting(boolean useLighting) {
         this.useLighting = useLighting;
+        render();
+    }
+
+    // Методы для управления освещением
+    public void setAmbientLight(double ambient) {
+        renderer.setAmbientLight(ambient);
+        render();
+    }
+
+    public void setDiffuseIntensity(double diffuse) {
+        renderer.setDiffuseIntensity(diffuse);
+        render();
+    }
+
+    public void setLightDirection(double x, double y, double z) {
+        renderer.setLightDirection(x, y, z);
         render();
     }
 
@@ -96,35 +112,29 @@ public class RenderPanel extends Pane {
     public Canvas getCanvas() {
         return canvas;
     }
-
-    public void moveCameraForward() {
-        cameraZ -= 0.5;
-        render();
+    // В класс RenderPanel добавьте эти методы:
+    public double getAmbientLight() {
+        return renderer.getAmbientLight();
     }
 
-    public void moveCameraBackward() {
-        cameraZ += 0.5;
-        render();
+    public double getDiffuseIntensity() {
+        return renderer.getDiffuseIntensity();
     }
 
-    public void moveCameraLeft() {
-        cameraX -= 0.5;
-        render();
+    public boolean isRenderWireframe() {
+        return renderWireframe;
     }
 
-    public void moveCameraRight() {
-        cameraX += 0.5;
-        render();
+    public boolean isUseTexture() {
+        return useTexture;
     }
 
-    public void rotateCameraLeft() {
-        cameraRotationY -= 5;
-        render();
+    public boolean isUseLighting() {
+        return useLighting;
     }
 
-    public void rotateCameraRight() {
-        cameraRotationY += 5;
-        render();
+    public SoftwareRenderer getRenderer() {
+        return renderer;
     }
 
     // В SoftwareRenderer нужно передать параметры камеры:

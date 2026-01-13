@@ -7,6 +7,10 @@ public class Vertex {
     public final double u; // Текстурная координата U
     public final double v; // Текстурная координата V
 
+    public Vertex(double x, double y, double z) {
+        this(x, y, z, 0, 0);
+    }
+
     public Vertex(double x, double y, double z, double u, double v) {
         this.x = x;
         this.y = y;

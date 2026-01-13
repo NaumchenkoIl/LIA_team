@@ -16,6 +16,11 @@ public class NormalCalculator {
         while(var2.hasNext()) {
             Polygon polygon = (Polygon)var2.next();
             Vector3D normal = this.calculatePolygonNormal(model, polygon);
+
+            if (normal.getZ() > 0) {
+                normal = new Vector3D(-normal.getX(), -normal.getY(), -normal.getZ());
+            }
+
             polygon.setNormal(normal.normalize());
         }
 

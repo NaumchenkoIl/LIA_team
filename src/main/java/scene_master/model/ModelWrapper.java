@@ -21,6 +21,35 @@ public class ModelWrapper {
             normalCalculator.calculateNormals(model);
         }
         this.uiModel = convertToUIModel(model); // конвертируем в ui-представление
+
+        if (uiModel != null) {
+            forceFixUIModelNormals();
+        }
+    }
+
+    private void forceFixUIModelNormals() {
+        System.out.println("=== ПРИНУДИТЕЛЬНЫЙ ФИКС НОРМАЛЕЙ UI МОДЕЛИ ===");
+
+        // 1. Пересчитываем нормали (используем наш исправленный метод)
+        uiModel.calculateNormals();
+
+        // 2. Проверяем все нормали
+        int wrongNormals = 0;
+        for (Polygon polygon : uiModel.getPolygons()) {
+            Vector3D normal = polygon.getNormal();
+            if (normal != null && normal.getZ() > 0) {
+                wrongNormals++;
+                // Экстренная инверсия
+                polygon.setNormal(new Vector3D(-normal.getX(), -normal.getY(), -normal.getZ()));
+            }
+        }
+
+        if (wrongNormals > 0) {
+            System.out.println("Исправлено " + wrongNormals + " нормалей с Z > 0");
+        }
+
+        // 3. Создаем vertex normals для сглаживания
+        uiModel.calculateVertexNormals();
     }
 
     private Model3D convertToUIModel(Model model) {

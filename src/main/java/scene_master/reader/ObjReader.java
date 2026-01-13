@@ -1,6 +1,7 @@
 package scene_master.reader;
 
 import scene_master.model.Model; // класс модели данных
+import scene_master.model.Polygon;
 import scene_master.model.Vector3D; // математический вектор
 import java.io.BufferedReader; // буферизованное чтение
 import java.io.FileReader; // чтение файлов
@@ -35,7 +36,12 @@ public class ObjReader { //взял из своего 3 таска
                         case "f":  // полигон
                             parseFace(tokens, model, lineNumber); // парсим индексы полигона
                             break;
-                        // игнорируем другие типы данных (нормали, текстуры и тп.)
+                        case "vt":
+                            parseTextureVertex(tokens, model, lineNumber);
+                            break;
+                        case "vn":
+                            parseNormal(tokens, model, lineNumber);
+                            break;
                     }
                 } catch (Exception e) { // ловим любые исключения при парсинге
                     throw new IOException("Error parsing line " + lineNumber + ": " + line, e); // перебрасываем с контекстом
@@ -58,40 +64,88 @@ public class ObjReader { //взял из своего 3 таска
         model.addVertex(new Vector3D(x, y, z)); // добавляем вершину в модель
     }
 
-    private void parseFace(String[] tokens, Model model, int lineNumber) { // парсит строку полигона
-        if (tokens.length < 4) { // проверяем количество вершин
-            throw new IllegalArgumentException("Face requires at least 3 vertices"); // минимум 3 вершины
+    private void parseFace(String[] tokens, Model model, int lineNumber) {
+        if (tokens.length < 4) {
+            throw new IllegalArgumentException("Face requires at least 3 vertices");
         }
 
-        List<Integer> vertexIndices = new ArrayList<>(); // список индексов вершин полигона
-        List<Vector3D> vertices = model.getVertices(); // список всех вершин модели
+        List<Integer> vertexIndices = new ArrayList<>();
+        List<Integer> texIndices = new ArrayList<>();
+        List<Integer> normalIndices = new ArrayList<>();
 
-        for (int i = 1; i < tokens.length; i++) { // обрабатываем каждый токен вершины (начинаем с 1, т.к. 0 - это "f")
-            String vertexToken = tokens[i]; // токен вида "1" или "1/2/3"
-            String[] parts = vertexToken.split("/"); // разделяем на вершину/текстуру/нормаль
+        List<Vector3D> vertices = model.getVertices();
+        List<Vector3D> normals = model.getNormals(); // ← добавь геттер getNormals() в Model!
+        List<Vector3D> texCoords = model.getTextureVertices(); // ← добавь getTextureVertices() в Model!
 
-            int vertexIndex = parseInteger(parts[0]); // парсим индекс вершины (первая часть)
-            int actualIndex; // актуальный индекс в списке (0-based)
+        for (int i = 1; i < tokens.length; i++) {
+            String token = tokens[i].trim();
+            if (token.isEmpty()) continue;
 
-            if (vertexIndex > 0) { // если индекс положительный
-                actualIndex = vertexIndex - 1; // преобразуем в 0-based (индексы в OBJ начинаются с 1)
-            } else if (vertexIndex < 0) { // если индекс отрицательный
-                actualIndex = vertices.size() + vertexIndex; // вычисляем относительный индекс с конца
+            String[] parts = token.split("/");
+            int vIdx = parseVertexIndex(parts[0], vertices.size(), lineNumber);
+            vertexIndices.add(vIdx);
+
+            int tIdx = -1;
+            int nIdx = -1;
+
+            if (parts.length > 1 && !parts[1].isEmpty()) {
+                tIdx = parseVertexIndex(parts[1], texCoords != null ? texCoords.size() : 0, lineNumber);
+                texIndices.add(tIdx);
             } else {
-                throw new IllegalArgumentException("Invalid vertex index: 0"); // индекс 0 недопустим
+                texIndices.add(-1); // placeholder
             }
 
-            if (actualIndex < 0 || actualIndex >= vertices.size()) { // проверяем границы
-                throw new IllegalArgumentException( // если индекс вне диапазона
-                        "Vertex index out of bounds: " + vertexIndex +
-                                " (available vertices: 0 to " + (vertices.size() - 1) + ")"
-                );
+            if (parts.length > 2 && !parts[2].isEmpty()) {
+                nIdx = parseVertexIndex(parts[2], normals != null ? normals.size() : 0, lineNumber);
+                normalIndices.add(nIdx);
+            } else {
+                normalIndices.add(-1); // placeholder
             }
-
-            vertexIndices.add(actualIndex); // добавляем индекс в список
         }
 
-        model.addPolygon(new scene_master.model.Polygon(vertexIndices)); // создаем и добавляем полигон
+        // Убираем placeholder'ы (-1), если UV/нормалей нет вообще
+        boolean hasTex = texCoords != null && !texCoords.isEmpty();
+        boolean hasNorm = normals != null && !normals.isEmpty();
+
+        if (!hasTex) texIndices.clear();
+        if (!hasNorm) normalIndices.clear();
+
+        Polygon polygon = new Polygon(vertexIndices, texIndices, normalIndices);
+        model.addPolygon(polygon);
+    }
+
+    private void parseTextureVertex(String[] tokens, Model model, int lineNumber) {
+        double u = parseDouble(tokens[1]);
+        double v = tokens.length > 2 ? parseDouble(tokens[2]) : 0.0;
+        model.addTextureVertex(new Vector3D(u, v, 0));
+    }
+
+    private void parseNormal(String[] tokens, Model model, int lineNumber) {
+        double x = parseDouble(tokens[1]);
+        double y = parseDouble(tokens[2]);
+        double z = parseDouble(tokens[3]);
+        model.addNormal(new Vector3D(x, y, z));
+    }
+
+    private int parseVertexIndex(String str, int size, int line) {
+        if (str.isEmpty()) return -1;
+        int idx = parseInteger(str);
+        if (idx == 0) throw new IllegalArgumentException("OBJ indices start from 1");
+        if (size == 0) return idx - 1; // allow if list not initialized yet
+
+        int actual;
+        if (idx > 0) {
+            actual = idx - 1;
+        } else {
+            actual = size + idx;
+        }
+        if (actual < 0 || actual >= size) {
+            throw new IllegalArgumentException(
+                    "Index out of bounds on line " + line + ": " + idx +
+                            " (valid: 1 to " + size + ")"
+            );
+        }
+        return actual;
     }
 
     private double parseDouble(String str) { // парсит строку в double

@@ -7,11 +7,13 @@ import java.util.List;
 public class Polygon {
     private final List<Integer> vertexIndices;
     private final List<Integer> textureIndices; // Индексы текстурных координат
+    private final List<Integer> normalIndices; // Индексы текстурных координат
     private Vector3D normal;
 
-    public Polygon(List<Integer> vertexIndices) {
+    public Polygon(List<Integer> vertexIndices, List<Integer> textureIndices, List<Integer> normalIndices) {
         this.vertexIndices = List.copyOf(vertexIndices);
-        this.textureIndices = new ArrayList<>();
+        this.textureIndices = textureIndices != null ? new ArrayList<>(textureIndices) : new ArrayList<>();
+        this.normalIndices = normalIndices != null ? new ArrayList<>(normalIndices) : new ArrayList<>();
     }
 
     public Polygon(int... indices) {
@@ -20,6 +22,8 @@ public class Polygon {
             this.vertexIndices.add(index);
         }
         this.textureIndices = new ArrayList<>();
+        this.normalIndices = new ArrayList<>();
+
     }
 
     public void setNormal(Vector3D normal) {
@@ -43,6 +47,13 @@ public class Polygon {
     public Polygon(List<Integer> vertexIndices, List<Integer> textureIndices) {
         this.vertexIndices = List.copyOf(vertexIndices);
         this.textureIndices = new ArrayList<>(textureIndices);
+        this.normalIndices = new ArrayList<>();
+    }
+
+    public Polygon(List<Integer> vertexIndices) {
+        this.vertexIndices = List.copyOf(vertexIndices);
+        this.textureIndices = new ArrayList<>();
+        this.normalIndices = new ArrayList<>(); // если у тебя есть normalIndices
     }
 
     // Геттер для текстурных индексов
@@ -54,4 +65,5 @@ public class Polygon {
     public void addTextureIndex(int index) {
         textureIndices.add(index);
     }
+    public List<Integer> getNormalIndices() { return normalIndices; }
 }
