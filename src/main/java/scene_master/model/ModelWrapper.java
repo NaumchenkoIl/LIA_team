@@ -1,7 +1,7 @@
 package scene_master.model;
 
-import javafx.beans.property.SimpleStringProperty; // простое строковое свойство
-import javafx.beans.property.StringProperty; // интерфейс строкового свойства
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 
 public class ModelWrapper {
     private final Model originalModel; // оригинальная модель данных (из ObjReader)
@@ -22,40 +22,78 @@ public class ModelWrapper {
                 uiModel.getVertices().add(vertex.toVertex()); // преобразуем Vector3D в Vertex
             }
 
-            for (scene_master.model.Polygon polygon : model.getPolygons()) {// конвертируем полигоны
-                int[] indices = polygon.getVertexIndicesArray(); // получаем массив индексов
-                uiModel.getPolygons().add(new Polygon(indices)); // создаем новый полигон для UI
+            for (TexturePoint tp : model.getTexturePoints()) {// конвертируем текстурные координаты
+                uiModel.getTexturePoints().add(tp);
+            }
+
+            for (Vector3D normal : model.getNormals()) {// кнвертируем нормали
+                uiModel.getNormals().add(normal.toVertex());
+            }
+
+            for (scene_master.model.Polygon polygon : model.getPolygons()) { // конвертируем полигоны
+                int[] indices = polygon.getVertexIndicesArray();
+                Polygon uiPolygon = new Polygon(indices);
+
+                if (polygon.hasTexture()) {  // сохраняем текстуры
+                    uiPolygon.setTextureIndices(polygon.getTextureIndices());
+                }
+
+                if (polygon.hasNormals()) {// сохраняем нормали
+                    uiPolygon.setNormalIndices(polygon.getNormalIndices());
+                }
+
+                uiModel.getPolygons().add(uiPolygon);
             }
         }
 
-        return uiModel; // возвращаем ui-представление
+        return uiModel;
     }
 
-    public Model3D getUIModel() { // ui-модели
-        return uiModel; // возвращаем ui-представление
+    public Model3D getUIModel() {
+        return uiModel;
     }
 
-    public Model getOriginalModel() { //оригинальные модели
-        return originalModel; // возвращаем данные
+    public Model getOriginalModel() {
+        return originalModel;
     }
 
-    public StringProperty nameProperty() { // observable свойства имени
-        return name; // возвращаем свойство (можно привязывать к UI)
+    public StringProperty nameProperty() {
+        return name;
     }
 
-    public void updateUIModel() { // обновляет ui-модель (если изменились исходные данные)
-        if (originalModel == null) return; // если нет данных - выходим
+    public void updateUIModel() {
+        if (originalModel == null) return;
 
-        uiModel.getVertices().clear(); // очищаем список вершин
-        uiModel.getPolygons().clear(); // очищаем список полигонов
+        uiModel.getVertices().clear();
+        uiModel.getTexturePoints().clear();
+        uiModel.getNormals().clear();
+        uiModel.getPolygons().clear();
 
-        for (Vector3D vertex : originalModel.getVertices()) { // перезаполняем вершины
+        for (Vector3D vertex : originalModel.getVertices()) {// вершины
             uiModel.getVertices().add(vertex.toVertex());
         }
 
-        for (scene_master.model.Polygon polygon : originalModel.getPolygons()) { // перезаполняем полигоны
+        for (TexturePoint tp : originalModel.getTexturePoints()) { // текстуры
+            uiModel.getTexturePoints().add(tp);
+        }
+
+        for (Vector3D normal : originalModel.getNormals()) {// нормали
+            uiModel.getNormals().add(normal.toVertex());
+        }
+
+        for (scene_master.model.Polygon polygon : originalModel.getPolygons()) { // полигоны
             int[] indices = polygon.getVertexIndicesArray();
-            uiModel.getPolygons().add(new Polygon(indices));
+            Polygon uiPolygon = new Polygon(indices);
+
+            if (polygon.hasTexture()) {
+                uiPolygon.setTextureIndices(polygon.getTextureIndices());
+            }
+
+            if (polygon.hasNormals()) {
+                uiPolygon.setNormalIndices(polygon.getNormalIndices());
+            }
+
+            uiModel.getPolygons().add(uiPolygon);
         }
     }
 }

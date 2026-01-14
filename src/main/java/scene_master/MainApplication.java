@@ -21,9 +21,11 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.paint.Color;
+import javafx.scene.image.Image;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+
 
 public class MainApplication extends Application {
 
@@ -34,6 +36,8 @@ public class MainApplication extends Application {
     private BorderPane modelPropertiesPanel; // панель свойств модели
     private EditManager editManager = new EditManager();
     private String currentTheme = "dark";
+    private Image currentTexture = null; // текущая загруженная текстура
+    private String textureFileName = ""; // имя файла текстуры
 
     @Override
     public void start(Stage primaryStage) { // точка входа приложения
@@ -71,14 +75,16 @@ public class MainApplication extends Application {
 
         Menu fileMenu = new Menu("Файл"); // выпадающее меню
         MenuItem openItem = new MenuItem("Открыть модель...");
+        MenuItem loadTextureItem = new MenuItem("Загрузить текстуру...");
         MenuItem saveItem = new MenuItem("Сохранить модель как...");
         MenuItem exitItem = new MenuItem("Выход");
 
         openItem.setOnAction(e -> openModel()); // обработчик нажатия - открыть модель
+        loadTextureItem.setOnAction(e -> loadTexture()); // обработчик нажатия - загрузить текстуру
         saveItem.setOnAction(e -> saveModel()); // обработчик нажатия - сохранить модель
         exitItem.setOnAction(e -> primaryStage.close());//обработчик нажатия - закрыть приложение
 
-        fileMenu.getItems().addAll(openItem, saveItem, new SeparatorMenuItem(), exitItem); // добавляем пункты в меню
+        fileMenu.getItems().addAll(openItem, loadTextureItem, saveItem, new SeparatorMenuItem(), exitItem); // добавляем пункты в меню
 
         Menu editMenu = new Menu("Редактировать");
         CheckMenuItem editModeItem = new CheckMenuItem("Режим редактирования");
@@ -99,17 +105,58 @@ public class MainApplication extends Application {
         Menu viewMenu = new Menu("Вид");
         CheckMenuItem showWireframe = new CheckMenuItem("Показать каркас");
         CheckMenuItem showVertices = new CheckMenuItem("Показать вершины");
+        CheckMenuItem useTextureItem = new CheckMenuItem("Использовать текстуру");
+        CheckMenuItem useLightingItem = new CheckMenuItem("Использовать освещение");
         MenuItem darkThemeItem = new MenuItem("Тёмная тема");
         MenuItem lightThemeItem = new MenuItem("Светлая тема");
+
+        // Галочки для режимов отрисовки (задание 3-го человека)
+        useTextureItem.setDisable(true); // пока недоступно, пока не реализован 3D вид
+        useLightingItem.setDisable(true); // пока недоступно
 
         darkThemeItem.setOnAction(e -> switchTheme("dark"));
         lightThemeItem.setOnAction(e -> switchTheme("light"));
 
-        viewMenu.getItems().addAll(showWireframe, showVertices, new SeparatorMenuItem(),
-                darkThemeItem, lightThemeItem); // собираем меню вида
+        viewMenu.getItems().addAll(showWireframe, showVertices, useTextureItem, useLightingItem,
+                new SeparatorMenuItem(), darkThemeItem, lightThemeItem); // собираем меню вида
 
         menuBar.getMenus().addAll(fileMenu, editMenu, viewMenu); // добавляем все меню в строку меню
         return menuBar; // возвращаем созданную строку меню
+    }
+
+    private void loadTexture() { // загрузка текстуры из файла
+        Model3D activeModel = selectionManager.getActiveModel();
+        if (activeModel == null) {
+            DialogHelper.showWarningDialog("Внимание", "Выберите модель для загрузки текстуры");
+            return;
+        }
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Изображения", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif"),
+                new FileChooser.ExtensionFilter("Все файлы", "*.*")
+        );
+        fileChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+        File file = fileChooser.showOpenDialog(primaryStage);
+
+        if (file != null) {
+            try {
+                // Загружаем текстуру (для отображения в будущем 3D виде)
+                currentTexture = new Image(file.toURI().toString());
+                textureFileName = file.getName();
+
+                DialogHelper.showInfoDialog("Текстура загружена",
+                        "Текстура успешно загружена из файла:\n" + textureFileName +
+                                "\n\nРазмер: " + (int)currentTexture.getWidth() + "x" + (int)currentTexture.getHeight() +
+                                "\n\nДля применения текстуры включите режим 'Использовать текстуру' в меню 'Вид' (когда будет реализовано)");
+
+                // Обновляем статус бар
+                updateStatusBarTextureInfo();
+
+            } catch (Exception e) {
+                ErrorHandler.handleException(e, "загрузка текстуры");
+            }
+        }
     }
 
     private VBox createLeftPanel() { // создает левую панель со списком моделей
@@ -243,6 +290,7 @@ public class MainApplication extends Application {
         HBox statusBar = new HBox(10);
         statusBar.getStyleClass().add("status-bar");
         statusBar.setPadding(new Insets(5));
+        statusBar.setId("status-bar"); // ID для поиска
 
         Label statusLabel = new Label("Готово");
         statusLabel.setId("status-label");
@@ -264,8 +312,19 @@ public class MainApplication extends Application {
         Label polygonCountLabel = new Label("Полигонов: 0");
         polygonCountLabel.setId("polygon-count");
 
+        Label textureCountLabel = new Label("Текстур: 0");
+        textureCountLabel.setId("texture-count");
+
+        Label normalCountLabel = new Label("Нормалей: 0");
+        normalCountLabel.setId("normal-count");
+
+        Label textureInfoLabel = new Label("Текстура: не загружена");
+        textureInfoLabel.setId("texture-info");
+        textureInfoLabel.setTextFill(Color.GRAY);
+
         statusBar.getChildren().addAll(statusLabel, editModeLabel, new Separator(),
-                vertexCountLabel, polygonCountLabel);
+                vertexCountLabel, polygonCountLabel, textureCountLabel, normalCountLabel,
+                new Separator(), textureInfoLabel);
         return statusBar;
     }
 
@@ -287,13 +346,29 @@ public class MainApplication extends Application {
         ColorPicker colorPicker = new ColorPicker(fxColor); // виджет выбора цвета
         colorBox.getChildren().addAll(colorLabel, colorPicker); // собираем
 
-        Label statsLabel = new Label(String.format( // метка со статистикой
-                "Статистика: Вершин: %d || Полигонов: %d",
+        HBox textureBox = new HBox(10);// информация о текстуре
+        Label textureLabel = new Label("Текстура:");
+        Label textureInfo = new Label(currentTexture != null ? textureFileName : "не загружена");
+        textureInfo.setTextFill(currentTexture != null ? Color.GREEN : Color.GRAY);
+        Button loadTextureBtn = new Button("Загрузить...");
+        loadTextureBtn.setOnAction(e -> loadTexture());
+        textureBox.getChildren().addAll(textureLabel, textureInfo, loadTextureBtn);
+
+        Label statsLabel = new Label(String.format(
+                "Статистика модели:\n" +
+                        "• Вершин: %d\n" +
+                        "• Текстурных координат: %d\n" +
+                        "• Нормалей: %d\n" +
+                        "• Полигонов: %d",
                 model.getVertices().size(), // количество вершин
+                model.getTexturePoints().size(), // количество текстурных координат
+                model.getNormals().size(), // количество нормалей
                 model.getPolygons().size() // количество полигонов
         ));
+        statsLabel.setWrapText(true);
+        statsLabel.setStyle("-fx-font-size: 12px;");
 
-        properties.getChildren().addAll(nameBox, visibleCheck, colorBox, statsLabel); // собираем все свойства
+        properties.getChildren().addAll(nameBox, visibleCheck, colorBox, textureBox, statsLabel); // собираем все свойства
         modelPropertiesPanel.setCenter(properties); // устанавливаем свойства в центр панели
     }
 
@@ -317,9 +392,17 @@ public class MainApplication extends Application {
                 sceneManager.addModelWrapper(modelWrapper); // добавляем модель на сцену
 
                 DialogHelper.showInfoDialog("Успешно",
-                        String.format("Модель успешно загружена! Вершин: %d || Полигонов: %d",
+                        String.format("Модель успешно загружена!\n" +
+                                        "• Вершин: %d\n" +
+                                        "• Текстурных координат: %d\n" +
+                                        "• Нормалей: %d\n" +
+                                        "• Полигонов: %d",
                                 loadedModel.getVertexCount(), // количество вершин
+                                loadedModel.getTexturePointCount(), // количество текстурных координат
+                                loadedModel.getNormalCount(), // количество нормалей
                                 loadedModel.getPolygonCount())); // количество полигонов
+
+                updateStatistics(); // обновляем статистику в статус баре
 
             } catch (IOException e) {
                 ErrorHandler.handleException(e, "загрузка OBJ файла");
@@ -347,9 +430,17 @@ public class MainApplication extends Application {
                     objWriter.writeModel(activeModel, file.getAbsolutePath(), applyTransformations);
 
                     DialogHelper.showInfoDialog("Сохранение завершено",
-                            String.format("Модель успешно сохранена!\nФайл: %s\nВершин: %d\nПолигонов: %d\nТрансформации применены: %s",
+                            String.format("Модель успешно сохранена!\n\n" +
+                                            "Файл: %s\n" +
+                                            "Вершин: %d\n" +
+                                            "Текстурных координат: %d\n" +
+                                            "Нормалей: %d\n" +
+                                            "Полигонов: %d\n" +
+                                            "Трансформации применены: %s",
                                     file.getName(),
                                     activeModel.getVertices().size(),
+                                    activeModel.getTexturePoints().size(),
+                                    activeModel.getNormals().size(),
                                     activeModel.getPolygons().size(),
                                     applyTransformations ? "Да" : "Нет"));
 
@@ -457,7 +548,54 @@ public class MainApplication extends Application {
         }
     }
 
-    public static void main(String[] args) { // точка входа для запуска (каоимагдная строка)
+    private void updateStatistics() { // обновляет статистику в статус баре
+        Model3D activeModel = selectionManager.getActiveModel();
+        if (activeModel != null) {
+            updateStatusBarStatistics(activeModel);
+        }
+    }
+
+    private void updateStatusBarStatistics(Model3D model) {
+        HBox statusBar = (HBox) primaryStage.getScene().lookup("#status-bar");
+        if (statusBar == null) return;
+
+        Label vertexCountLabel = (Label) statusBar.lookup("#vertex-count");
+        Label polygonCountLabel = (Label) statusBar.lookup("#polygon-count");
+        Label textureCountLabel = (Label) statusBar.lookup("#texture-count");
+        Label normalCountLabel = (Label) statusBar.lookup("#normal-count");
+
+        if (vertexCountLabel != null) {
+            vertexCountLabel.setText("Вершин: " + model.getVertices().size());
+        }
+        if (polygonCountLabel != null) {
+            polygonCountLabel.setText("Полигонов: " + model.getPolygons().size());
+        }
+        if (textureCountLabel != null) {
+            textureCountLabel.setText("Текстур: " + model.getTexturePoints().size());
+        }
+        if (normalCountLabel != null) {
+            normalCountLabel.setText("Нормалей: " + model.getNormals().size());
+        }
+    }
+
+    private void updateStatusBarTextureInfo() { // обновляет информацию о текстуре в статус баре
+        HBox statusBar = (HBox) primaryStage.getScene().lookup("#status-bar");
+        if (statusBar == null) return;
+
+        Label textureInfoLabel = (Label) statusBar.lookup("#texture-info");
+        if (textureInfoLabel != null) {
+            if (currentTexture != null) {
+                textureInfoLabel.setText("Текстура: " + textureFileName +
+                        " (" + (int)currentTexture.getWidth() + "x" + (int)currentTexture.getHeight() + ")");
+                textureInfoLabel.setTextFill(Color.GREEN);
+            } else {
+                textureInfoLabel.setText("Текстура: не загружена");
+                textureInfoLabel.setTextFill(Color.GRAY);
+            }
+        }
+    }
+
+    public static void main(String[] args) { // точка входа для запуска (командная строка)
         launch(args); // запуск приложения
     }
 }

@@ -1,11 +1,6 @@
 package scene_master.model;
 
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
@@ -13,6 +8,8 @@ public class Model3D {
     private final StringProperty name = new SimpleStringProperty();
     private final BooleanProperty visible = new SimpleBooleanProperty(true);
     private final ObservableList<Vertex> vertices = FXCollections.observableArrayList();
+    private final ObservableList<TexturePoint> texturePoints = FXCollections.observableArrayList();
+    private final ObservableList<Vertex> normals = FXCollections.observableArrayList();
     private final ObservableList<Polygon> polygons = FXCollections.observableArrayList();
     private final DoubleProperty translateX = new SimpleDoubleProperty(0.0);
     private final DoubleProperty translateY = new SimpleDoubleProperty(0.0);
@@ -38,6 +35,14 @@ public class Model3D {
 
     public ObservableList<Vertex> getVertices() {
         return this.vertices;
+    }
+
+    public ObservableList<TexturePoint> getTexturePoints() {
+        return this.texturePoints;
+    }
+
+    public ObservableList<Vertex> getNormals() {
+        return this.normals;
     }
 
     public ObservableList<Polygon> getPolygons() {
@@ -81,11 +86,10 @@ public class Model3D {
     }
 
     public String getName() {
-        return (String)this.name.get();
+        return this.name.get();
     }
 
     public boolean isVisible() {
         return this.visible.get();
     }
 }
-
