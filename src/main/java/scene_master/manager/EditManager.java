@@ -1,7 +1,7 @@
 package scene_master.manager;
 
-import math.LinealAlgebra.Vector3D;
 import scene_master.model.Model3D;
+import scene_master.model.Vertex;
 import scene_master.model.Polygon;
 import javafx.collections.ObservableList;
 import java.util.ArrayList;
@@ -51,8 +51,7 @@ public class EditManager {
 
     public void deleteSelectedVertex(Model3D model) {
         if (selectedVertexIndex >= 0 && selectedVertexIndex < model.getVertices().size()) {
-            ObservableList<Vector3D> vertices = model.getVertices();
-
+            ObservableList<Vertex> vertices = model.getVertices();
             ObservableList<Polygon> polygons = model.getPolygons();
 
             vertices.remove(selectedVertexIndex);// удаляем вершину

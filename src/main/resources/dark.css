@@ -1,0 +1,87 @@
+/* Темная тема */
+.root {
+    -fx-base: #2d2d2d;
+    -fx-background: #1e1e1e;
+    -fx-control-inner-background: #2d2d2d;
+    -fx-text-fill: #e0e0e0;
+}
+
+.left-panel, .right-panel {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #444;
+}
+
+.left-panel {
+    -fx-border-width: 0 1 0 0;
+}
+
+.right-panel {
+    -fx-border-width: 0 0 0 1;
+}
+
+.section-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #66b3ff;
+    -fx-padding: 0 0 5 0;
+}
+
+.view-3d {
+    -fx-background-color: #1a1a2e;
+}
+
+.status-bar {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #444;
+    -fx-border-width: 1 0 0 0;
+}
+
+.button {
+    -fx-background-color: #3d3d3d;
+    -fx-text-fill: #e0e0e0;
+    -fx-background-radius: 3;
+    -fx-padding: 5 10 5 10;
+}
+
+.button:hover {
+    -fx-background-color: #4d4d4d;
+}
+
+.button:pressed {
+    -fx-background-color: #5d5d5d;
+}
+
+.list-view {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #444;
+}
+
+.list-cell {
+    -fx-background-color: #2d2d2d;
+    -fx-text-fill: #e0e0e0;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: #2a4d69;
+    -fx-text-fill: white;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: #3d3d3d;
+}
+
+.menu-bar {
+    -fx-background-color: #2d2d2d;
+    -fx-border-color: #444;
+}
+
+.text-field {
+    -fx-background-color: #3d3d3d;
+    -fx-text-fill: #e0e0e0;
+    -fx-border-color: #555;
+}
+
+/* Для режима редактирования */
+#edit-mode-label {
+    -fx-text-fill: #ff6666;
+}

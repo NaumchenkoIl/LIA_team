@@ -1,0 +1,87 @@
+/* Светлая тема */
+.root {
+    -fx-base: #f0f0f0;
+    -fx-background: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-text-fill: #333333;
+}
+
+.left-panel, .right-panel {
+    -fx-background-color: #f8f8f8;
+    -fx-border-color: #dddddd;
+}
+
+.left-panel {
+    -fx-border-width: 0 1 0 0;
+}
+
+.right-panel {
+    -fx-border-width: 0 0 0 1;
+}
+
+.section-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0066cc;
+    -fx-padding: 0 0 5 0;
+}
+
+.view-3d {
+    -fx-background-color: #e8e8e8;
+}
+
+.status-bar {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #cccccc;
+    -fx-border-width: 1 0 0 0;
+}
+
+.button {
+    -fx-background-color: #e0e0e0;
+    -fx-text-fill: #333333;
+    -fx-background-radius: 3;
+    -fx-padding: 5 10 5 10;
+}
+
+.button:hover {
+    -fx-background-color: #d0d0d0;
+}
+
+.button:pressed {
+    -fx-background-color: #c0c0c0;
+}
+
+.list-view {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #cccccc;
+}
+
+.list-cell {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #333333;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: #4a86e8;
+    -fx-text-fill: white;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: #f0f0f0;
+}
+
+.menu-bar {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #cccccc;
+}
+
+.text-field {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #333333;
+    -fx-border-color: #cccccc;
+}
+
+/* Для режима редактирования */
+#edit-mode-label {
+    -fx-text-fill: #cc0000;
+}
