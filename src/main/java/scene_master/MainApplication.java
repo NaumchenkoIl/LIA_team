@@ -16,7 +16,6 @@ import scene_master.model.ModelWrapper;
 import scene_master.model.Polygon;
 import scene_master.reader.ObjReader;
 import scene_master.renderer.RenderPanel;
-import scene_master.renderer.TextureManager;
 import scene_master.writer.ObjWriter;
 import scene_master.util.DialogHelper;
 import scene_master.util.ErrorHandler;
@@ -33,6 +32,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.paint.Color;
 import javafx.scene.image.Image;
+import javafx.scene.paint.Color;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -54,12 +54,13 @@ public class MainApplication extends Application {
     private EditManager editManager = new EditManager();
     private String currentTheme = "dark";
     private RenderPanel renderPanel;
+    private Stage loadingStage;
 
     @Override
     public void start(Stage primaryStage) { // точка входа приложения
         this.primaryStage = primaryStage; // сохраняем ссылку на окно
         this.selectionManager = new SelectionManager(); // создаем менеджер выделения
-        this.sceneManager = new SceneManager(selectionManager); //сздаем менеджер сцены
+        this.sceneManager = new SceneManager(selectionManager); //создаем менеджер сцены
 
         BorderPane root = new BorderPane(); // главный контейнер (распределяет элементы по сторонам)
         root.getStyleClass().add("root");
@@ -138,7 +139,6 @@ public class MainApplication extends Application {
             useTextureItem.setDisable(!hasTexture);
         });
 
-      //  useTextureItem.setDisable(true); // пока недоступно, пока не реализован 3D вид
         useLightingItem.setDisable(true); // пока недоступно
 
         darkThemeItem.setOnAction(e -> switchTheme("dark"));
@@ -223,7 +223,7 @@ public class MainApplication extends Application {
         modelListView = new ListView<>(); // список моделей (виджет)
         modelListView.setItems(sceneManager.getModelWrappers());// привязываем данные из sceneManager
         modelListView.setCellFactory(lv -> new ModelListCell()); // настраиваем отображение элементов списка
-        modelListView.getSelectionModel().selectedItemProperty().addListener( //слушаткль изменения выделения
+        modelListView.getSelectionModel().selectedItemProperty().addListener( //слушатель изменения выделения
                 (obs, oldVal, newVal) -> {
                     selectionManager.clearSelection(); // очищаем предыдущее выделение
                     if (newVal != null) { // если выбран новый элемент (не null)
@@ -393,7 +393,9 @@ public class MainApplication extends Application {
         visibleCheck.selectedProperty().bindBidirectional(model.visibleProperty()); // привязка к свойству видимости
 
         model.visibleProperty().addListener((obs, oldVal, newVal) -> {
-            renderPanel.render();
+            if (renderPanel != null) {
+                renderPanel.render();
+            }
         });
 
         HBox colorBox = new HBox(10); // контейнер для выбора цвета
@@ -401,16 +403,6 @@ public class MainApplication extends Application {
         ColorPicker colorPicker = new ColorPicker(model.getBaseColor());
         colorPicker.valueProperty().bindBidirectional(model.baseColorProperty());
         colorBox.getChildren().addAll(colorLabel, colorPicker);
-
-        HBox textureBox = new HBox(10);// информация о текстуре
-        Label textureLabel = new Label("Текстура:");
-        Label textureInfo = new Label(
-                model.getTexture() != null ? "✓ Текстура загружена" : "Нет текстуры"
-        );
-        textureInfo.setTextFill(model.getTexture() != null ? Color.GREEN : Color.GRAY);
-        Button loadTextureBtn = new Button("Загрузить...");
-        loadTextureBtn.setOnAction(e -> loadTexture());
-        textureBox.getChildren().addAll(textureLabel, textureInfo, loadTextureBtn);
 
         model.baseColorProperty().addListener((obs, oldVal, newVal) -> {
             if (renderPanel != null) {
@@ -424,6 +416,16 @@ public class MainApplication extends Application {
                 renderPanel.render();
             }
         });
+
+        HBox textureBox = new HBox(10);// информация о текстуре
+        Label textureLabel = new Label("Текстура:");
+        Label textureInfo = new Label(
+                model.getTexture() != null ? "✓ Текстура загружена" : "Нет текстуры"
+        );
+        textureInfo.setTextFill(model.getTexture() != null ? Color.GREEN : Color.GRAY);
+        Button loadTextureBtn = new Button("Загрузить...");
+        loadTextureBtn.setOnAction(e -> loadTexture());
+        textureBox.getChildren().addAll(textureLabel, textureInfo, loadTextureBtn);
 
         Label statsLabel = new Label(String.format(
                 "Статистика модели:\n" +
@@ -560,10 +562,6 @@ public class MainApplication extends Application {
 
             sceneManager.addModelWrapper(wrapper);
 
-           /* if (wrapper.getUIModel() != null) {
-                checkAndFixUVCoordinates(wrapper.getUIModel());
-            }*/
-
             if (renderPanel != null) {
                 List<Model3D> models = sceneManager.getModelWrappers().stream()
                         .map(ModelWrapper::getUIModel)
@@ -694,7 +692,6 @@ public class MainApplication extends Application {
         }
     }
 
-
     private void applyTransformationsToOriginalModel(ModelWrapper wrapper) {
         Model3D uiModel = wrapper.getUIModel();
         Model originalModel = wrapper.getOriginalModel();
@@ -739,8 +736,6 @@ public class MainApplication extends Application {
         NormalCalculator calc = new NormalCalculator();
         calc.calculateNormals(originalModel);
     }
-
-    private Stage loadingStage;
 
     private void showLoadingIndicator(boolean show) {
         if (show) {
