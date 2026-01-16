@@ -1,4 +1,4 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra;
+package math.LinealAlgebra;
 
 public final class Vector3D extends AbstractVector<Vector3D> {
     public Vector3D(float x, float y, float z){

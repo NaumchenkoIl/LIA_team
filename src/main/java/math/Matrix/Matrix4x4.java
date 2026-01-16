@@ -1,7 +1,7 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix;
+package math.Matrix;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector3D;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector4D;
+import math.LinealAlgebra.Vector3D;
+import math.LinealAlgebra.Vector4D;
 
 public final class Matrix4x4 extends AbstractMatrix<Matrix4x4, Vector4D> {
     public Matrix4x4(float[][] components){

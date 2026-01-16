@@ -1,8 +1,6 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector3D;
+package math;
+import math.LinealAlgebra.Vector3D;
 import javafx.scene.input.KeyCode;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Camera;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.CameraController;
 
 public class CameraInputAdapter {
 

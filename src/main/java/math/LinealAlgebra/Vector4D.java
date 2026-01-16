@@ -1,4 +1,4 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra;
+package math.LinealAlgebra;
 
 
 public final class Vector4D extends AbstractVector<Vector4D> {

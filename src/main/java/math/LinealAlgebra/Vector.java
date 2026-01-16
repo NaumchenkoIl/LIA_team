@@ -1,4 +1,4 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra;
+package math.LinealAlgebra;
 
 public interface Vector <T extends Vector<T>>{
     T add(T other);

@@ -1,7 +1,6 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix;
+package math.Matrix;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector3D;
+import math.LinealAlgebra.Vector3D;
 
 public final class Matrix3x3 extends AbstractMatrix<Matrix3x3, Vector3D> {
     public Matrix3x3(float[][] components){

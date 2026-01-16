@@ -1,8 +1,8 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul;
+package math;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector3D;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector4D;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix.Matrix4x4;
+import math.LinealAlgebra.Vector3D;
+import math.LinealAlgebra.Vector4D;
+import math.Matrix.Matrix4x4;
 
 public class ModelTransform {
     private Vector3D translation = new Vector3D(0, 0, 0);

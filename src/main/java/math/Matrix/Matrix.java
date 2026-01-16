@@ -1,6 +1,6 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix;
+package math.Matrix;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector;
+import math.LinealAlgebra.Vector;
 
 public interface Matrix<T extends Matrix<T, V>, V extends Vector<V>>{
     T add(T other);

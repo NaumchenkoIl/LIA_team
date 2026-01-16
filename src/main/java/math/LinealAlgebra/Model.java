@@ -1,6 +1,6 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra;
+package math.LinealAlgebra;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.ModelTransform;
+import math.ModelTransform;
 
 public class Model {
     private Vector3D[] vertices;

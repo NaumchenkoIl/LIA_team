@@ -1,6 +1,6 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix;
+package math.Matrix;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.AbstractVector;
+import math.LinealAlgebra.AbstractVector;
 
 public abstract class AbstractMatrix<T extends AbstractMatrix<T, V>, V extends AbstractVector<V>> implements Matrix<T, V> {
 

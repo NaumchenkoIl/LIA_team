@@ -1,9 +1,9 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Tests;
+package math.Tests;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinearAlgebraEngine;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Model;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.ModelTransform;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector3D;
+import math.LinearAlgebraEngine;
+import math.Model;
+import math.ModelTransform;
+import math.LinealAlgebra.Vector3D;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

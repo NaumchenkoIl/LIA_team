@@ -1,4 +1,4 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra;
+package math.LinealAlgebra;
 
 public abstract class AbstractVector<T extends AbstractVector<T>> implements Vector<T> {
 

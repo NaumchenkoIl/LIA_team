@@ -1,10 +1,10 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul;
+package math;
 
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector2D;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector3D;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector4D;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix.Matrix3x3;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix.Matrix4x4;
+import math.LinealAlgebra.Vector2D;
+import math.LinealAlgebra.Vector3D;
+import math.LinealAlgebra.Vector4D;
+import math.Matrix.Matrix3x3;
+import math.Matrix.Matrix4x4;
 
 public final class LinearAlgebraEngine {
 

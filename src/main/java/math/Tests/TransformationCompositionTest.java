@@ -1,7 +1,6 @@
-package com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Tests;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinearAlgebraEngine;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.Matrix.Matrix4x4;
-import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.LinealAlgebra.Vector4D;
+package math.Tests;
+import math.LinearAlgebraEngine;
+import math.LinealAlgebra.Vector4D;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
