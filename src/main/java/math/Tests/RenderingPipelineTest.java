@@ -1,5 +1,6 @@
 package math.Tests;
 
+import com.example.mathpartofrender.vsu.fcs.kg.Dubovickaya.math.modul.*;
 import math.Camera;
 import math.LinealAlgebra.Vector3D;
 import math.LinealAlgebra.Vector4D;

@@ -29,20 +29,25 @@ public class RenderPanel extends Pane {
     private Color selectedVertexColor = Color.RED;
 
     public RenderPanel(double width, double height) {
+        // 1. Создаём Canvas
         canvas = new Canvas(width, height);
         getChildren().add(canvas);
 
+        // 2. Привязываем размеры
         canvas.widthProperty().bind(this.widthProperty());
         canvas.heightProperty().bind(this.heightProperty());
 
         camera = new Camera(new Vector3D(0, 0, 5), new Vector3D(0, 0, 0));
         renderer = new SoftwareRenderer(canvas, camera);
 
+        // 5. Настраиваем обработчики
         setupMouseHandlers();
 
         setFocusTraversable(true);
         canvas.setOnMouseClicked(e -> requestFocus());
     }
+        canvas.setOnMouseClicked(e -> requestFocus());}
+
 
     public void setModels(List<Model3D> models) {
         this.models = models;
@@ -258,8 +263,13 @@ public class RenderPanel extends Pane {
         render();
     }
 
+
     public void setUseLighting(boolean useLighting) {
         this.useLighting = useLighting;
+        if (renderer != null) {
+            renderer.setUseLighting(useLighting);
+            render();
+        }
         render();
     }
 
@@ -306,6 +316,7 @@ public class RenderPanel extends Pane {
         renderer.setBackgroundColor(color);
         render();
     }
+
 
     public Canvas getCanvas() {
         return canvas;

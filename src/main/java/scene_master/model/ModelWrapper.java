@@ -21,6 +21,10 @@ public class ModelWrapper {
             normalCalculator.calculateNormals(model);
         }
         this.uiModel = convertToUIModel(model); // конвертируем в ui-представление
+
+        if (this.uiModel != null) {
+            this.uiModel.calculateVertexNormals();
+        }
     }
 
     private Model3D convertToUIModel(Model model) { // конвертирует Model в Model3D
@@ -55,6 +59,10 @@ public class ModelWrapper {
 
                 if (polygon.hasNormals()) {// сохраняем нормали
                     uiPolygon.setNormalIndices(polygon.getNormalIndices());
+                }
+
+                if (polygon.getNormal() != null) {
+                    uiPolygon.setNormal(polygon.getNormal());
                 }
 
                 uiModel.getPolygons().add(uiPolygon);

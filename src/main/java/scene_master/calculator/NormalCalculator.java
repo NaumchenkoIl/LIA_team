@@ -22,6 +22,7 @@ public class NormalCalculator {
 
             polygon.setNormal(normal.normalize());
         }
+
     }
 
     private Vector3D calculatePolygonNormal(Model model, Polygon polygon) {
@@ -32,10 +33,10 @@ public class NormalCalculator {
             Vector3D v1 = model.getVertices().get(indices.get(0));
             Vector3D v2 = model.getVertices().get(indices.get(1));
             Vector3D v3 = model.getVertices().get(indices.get(2));
-            
+
             Vector3D s1 = v2.subtract(v1);
             Vector3D s2 = v3.subtract(v1);
-           
+
             return s1.cross(s2);
         }
     }
