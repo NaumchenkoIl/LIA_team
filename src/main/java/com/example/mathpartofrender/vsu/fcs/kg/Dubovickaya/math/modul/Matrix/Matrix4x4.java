@@ -172,8 +172,8 @@ public final class Matrix4x4 extends AbstractMatrix<Matrix4x4, Vector4D> {
 
         return new Matrix4x4(new float[][]{
                 {1f,  0f,   0f,  0f},
-                {0f,  cos, sin, 0f},
-                {0f,  -sin,  cos, 0f},
+                {0f,  cos, -sin, 0f},
+                {0f,  sin,  cos, 0f},
                 {0f,  0f,   0f,  1f}
         });
     }
