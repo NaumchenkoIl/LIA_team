@@ -2,6 +2,7 @@ package scene_master.model;
 
 import java.util.List;
 import java.util.ArrayList;
+import math.LinealAlgebra.Vector3D;
 
 public class Polygon {
     private final List<Integer> vertexIndices;
@@ -65,4 +66,7 @@ public class Polygon {
     public boolean hasNormals() {
         return !normalIndices.isEmpty();
     }
-}
+
+    public void addTextureIndex(int index) {
+        textureIndices.add(index);
+    }}

@@ -1,11 +1,21 @@
 package scene_master;
 
+import javafx.collections.ListChangeListener;
+import javafx.concurrent.Task;
+import javafx.stage.Modality;
+import math.LinealAlgebra.Vector3D;
+import math.ModelTransform;
+import scene_master.calculator.NormalCalculator;
+import scene_master.calculator.Triangulator;
 import scene_master.manager.SceneManager;
 import scene_master.manager.SelectionManager;
 import scene_master.manager.EditManager;
+import scene_master.model.Model;
 import scene_master.model.Model3D;
 import scene_master.model.ModelWrapper;
+import scene_master.model.Polygon;
 import scene_master.reader.ObjReader;
+import scene_master.renderer.RenderPanel;
 import scene_master.writer.ObjWriter;
 import scene_master.util.DialogHelper;
 import scene_master.util.ErrorHandler;
@@ -22,9 +32,16 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.paint.Color;
 import javafx.scene.image.Image;
+import javafx.scene.paint.Color;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 
 public class MainApplication extends Application {
@@ -36,14 +53,14 @@ public class MainApplication extends Application {
     private BorderPane modelPropertiesPanel; // панель свойств модели
     private EditManager editManager = new EditManager();
     private String currentTheme = "dark";
-    private Image currentTexture = null; // текущая загруженная текстура
-    private String textureFileName = ""; // имя файла текстуры
+    private RenderPanel renderPanel;
+    private Stage loadingStage;
 
     @Override
     public void start(Stage primaryStage) { // точка входа приложения
         this.primaryStage = primaryStage; // сохраняем ссылку на окно
         this.selectionManager = new SelectionManager(); // создаем менеджер выделения
-        this.sceneManager = new SceneManager(selectionManager); //сздаем менеджер сцены
+        this.sceneManager = new SceneManager(selectionManager); //создаем менеджер сцены
 
         BorderPane root = new BorderPane(); // главный контейнер (распределяет элементы по сторонам)
         root.getStyleClass().add("root");
@@ -110,8 +127,18 @@ public class MainApplication extends Application {
         MenuItem darkThemeItem = new MenuItem("Тёмная тема");
         MenuItem lightThemeItem = new MenuItem("Светлая тема");
 
-        // Галочки для режимов отрисовки (задание 3-го человека)
-        useTextureItem.setDisable(true); // пока недоступно, пока не реализован 3D вид
+        useTextureItem.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (renderPanel != null) {
+                renderPanel.setUseTexture(newVal);
+            }
+        });
+
+        selectionManager.getSelectedModels().addListener((ListChangeListener<Model3D>) c -> {
+            boolean hasTexture = selectionManager.getActiveModel() != null &&
+                    selectionManager.getActiveModel().getTexture() != null;
+            useTextureItem.setDisable(!hasTexture);
+        });
+
         useLightingItem.setDisable(true); // пока недоступно
 
         darkThemeItem.setOnAction(e -> switchTheme("dark"));
@@ -140,22 +167,48 @@ public class MainApplication extends Application {
         File file = fileChooser.showOpenDialog(primaryStage);
 
         if (file != null) {
-            try {
-                // Загружаем текстуру (для отображения в будущем 3D виде)
-                currentTexture = new Image(file.toURI().toString());
-                textureFileName = file.getName();
+            showLoadingIndicator(true);
+
+            Task<Image> textureTask = new Task<>() {
+                @Override
+                protected Image call() throws Exception {
+                    return new Image(file.toURI().toString(), false);
+                }
+            };
+
+            textureTask.setOnSucceeded(event -> {
+                Image texture = textureTask.getValue();
+
+                if (texture.isError()) {
+                    ErrorHandler.handleException(new RuntimeException("Ошибка загрузки текстуры"), "загрузка текстуры");
+                    showLoadingIndicator(false);
+                    return;
+                }
+
+                activeModel.setTexture(texture);
+
+                if (activeModel.getTextureCoords().isEmpty()) {
+                    createDefaultUVCoordinates(activeModel);
+                }
+
+                if (renderPanel != null) {
+                    renderPanel.setUseTexture(true);
+                    renderPanel.render();
+                }
+
+                updateModelPropertiesPanel(activeModel);
+                showLoadingIndicator(false);
 
                 DialogHelper.showInfoDialog("Текстура загружена",
-                        "Текстура успешно загружена из файла:\n" + textureFileName +
-                                "\n\nРазмер: " + (int)currentTexture.getWidth() + "x" + (int)currentTexture.getHeight() +
-                                "\n\nДля применения текстуры включите режим 'Использовать текстуру' в меню 'Вид' (когда будет реализовано)");
+                        "Текстура '" + file.getName() + "' применена к модели");
+            });
 
-                // Обновляем статус бар
-                updateStatusBarTextureInfo();
+            textureTask.setOnFailed(event -> {
+                showLoadingIndicator(false);
+                ErrorHandler.handleException(textureTask.getException(), "загрузка текстуры");
+            });
 
-            } catch (Exception e) {
-                ErrorHandler.handleException(e, "загрузка текстуры");
-            }
+            new Thread(textureTask).start();
         }
     }
 
@@ -170,7 +223,7 @@ public class MainApplication extends Application {
         modelListView = new ListView<>(); // список моделей (виджет)
         modelListView.setItems(sceneManager.getModelWrappers());// привязываем данные из sceneManager
         modelListView.setCellFactory(lv -> new ModelListCell()); // настраиваем отображение элементов списка
-        modelListView.getSelectionModel().selectedItemProperty().addListener( //слушаткль изменения выделения
+        modelListView.getSelectionModel().selectedItemProperty().addListener( //слушатель изменения выделения
                 (obs, oldVal, newVal) -> {
                     selectionManager.clearSelection(); // очищаем предыдущее выделение
                     if (newVal != null) { // если выбран новый элемент (не null)
@@ -210,22 +263,21 @@ public class MainApplication extends Application {
     }
 
     private Pane createCenterPanel() { // создает центральную панель для 3d-отображения
-        Pane view3d = new Pane(); // контейнер для 3d-вида
-        view3d.getStyleClass().add("view-3d");
-        view3d.setStyle("-fx-background-color: #1a1a2e;"); // темно-синий фон
+        renderPanel = new RenderPanel(800, 600);
+        renderPanel.getStyleClass().add("view-3d");
+        renderPanel.setStyle("-fx-background-color: #1a1a2e;");
 
-        Label placeholder = new Label("3D Вид (Будет реализовано другими членами команды)"); // заглушка
-        placeholder.setStyle("-fx-text-fill: #cccccc; -fx-font-size: 16px; -fx-alignment: center;");
-        placeholder.setMaxWidth(Double.MAX_VALUE); // растягиваем на всю ширину
-        placeholder.setMaxHeight(Double.MAX_VALUE); // растягиваем на всю высоту
-        VBox.setVgrow(placeholder, Priority.ALWAYS); // разрешаем растягивание
+        sceneManager.getModelWrappers().addListener((ListChangeListener<ModelWrapper>) change -> {
+            List<Model3D> models = new ArrayList<>();
+            for (ModelWrapper wrapper : sceneManager.getModelWrappers()) {
+                if (wrapper.getUIModel() != null) {
+                    models.add(wrapper.getUIModel());
+                }
+            }
+            renderPanel.setModels(models);
+        });
 
-        VBox container = new VBox(placeholder); // контейнер для центрирования
-        container.setAlignment(javafx.geometry.Pos.CENTER); // выравнивание по центру
-        VBox.setVgrow(container, Priority.ALWAYS); // разрешаем растягивание
-
-        view3d.getChildren().add(container); // добавляем заглушку в панель
-        return view3d; // возвращаем панель
+        return renderPanel;
     }
 
     private VBox createRightPanel() { // создает правую панель свойств
@@ -340,16 +392,37 @@ public class MainApplication extends Application {
         CheckBox visibleCheck = new CheckBox("Видима");
         visibleCheck.selectedProperty().bindBidirectional(model.visibleProperty()); // привязка к свойству видимости
 
+        model.visibleProperty().addListener((obs, oldVal, newVal) -> {
+            if (renderPanel != null) {
+                renderPanel.render();
+            }
+        });
+
         HBox colorBox = new HBox(10); // контейнер для выбора цвета
         Label colorLabel = new Label("Цвет:");
-        javafx.scene.paint.Color fxColor = javafx.scene.paint.Color.LIGHTBLUE; // цвет по умолчанию
-        ColorPicker colorPicker = new ColorPicker(fxColor); // виджет выбора цвета
-        colorBox.getChildren().addAll(colorLabel, colorPicker); // собираем
+        ColorPicker colorPicker = new ColorPicker(model.getBaseColor());
+        colorPicker.valueProperty().bindBidirectional(model.baseColorProperty());
+        colorBox.getChildren().addAll(colorLabel, colorPicker);
+
+        model.baseColorProperty().addListener((obs, oldVal, newVal) -> {
+            if (renderPanel != null) {
+                renderPanel.render();
+            }
+        });
+
+        model.textureProperty().addListener((obs, oldVal, newVal) -> {
+            if (renderPanel != null) {
+                renderPanel.setUseTexture(newVal != null);
+                renderPanel.render();
+            }
+        });
 
         HBox textureBox = new HBox(10);// информация о текстуре
         Label textureLabel = new Label("Текстура:");
-        Label textureInfo = new Label(currentTexture != null ? textureFileName : "не загружена");
-        textureInfo.setTextFill(currentTexture != null ? Color.GREEN : Color.GRAY);
+        Label textureInfo = new Label(
+                model.getTexture() != null ? "✓ Текстура загружена" : "Нет текстуры"
+        );
+        textureInfo.setTextFill(model.getTexture() != null ? Color.GREEN : Color.GRAY);
         Button loadTextureBtn = new Button("Загрузить...");
         loadTextureBtn.setOnAction(e -> loadTexture());
         textureBox.getChildren().addAll(textureLabel, textureInfo, loadTextureBtn);
@@ -380,41 +453,55 @@ public class MainApplication extends Application {
         File file = fileChooser.showOpenDialog(primaryStage); // показываем диалог
 
         if (file != null) { // если файл выбран
-            try {
-                ObjReader objReader = new ObjReader(); // создаем загрузчик
-                scene_master.model.Model loadedModel = objReader.readModel(file.getAbsolutePath()); // загружаем модель
+            showLoadingIndicator(true);
 
-                ModelWrapper modelWrapper = new ModelWrapper( // создаем обертку
-                        loadedModel, // загруженные данные
-                        file.getName().replace(".obj", "") // имя файла без расширения
-                );
+            Task<ModelWrapper> loadTask = new Task<>() {
+                @Override
+                protected ModelWrapper call() throws Exception {
+                    ObjReader objReader = new ObjReader();
+                    Model loadedModel = objReader.readModel(file.getAbsolutePath());
 
-                sceneManager.addModelWrapper(modelWrapper); // добавляем модель на сцену
+                    return new ModelWrapper(loadedModel,
+                            file.getName().replace(".obj", ""));
+                }
+            };
+
+            loadTask.setOnSucceeded(event -> {
+                ModelWrapper wrapper = loadTask.getValue();
+                sceneManager.addModelWrapper(wrapper);
+                showLoadingIndicator(false);
 
                 DialogHelper.showInfoDialog("Успешно",
-                        String.format("Модель успешно загружена!\n" +
-                                        "• Вершин: %d\n" +
-                                        "• Текстурных координат: %d\n" +
-                                        "• Нормалей: %d\n" +
-                                        "• Полигонов: %d",
-                                loadedModel.getVertexCount(), // количество вершин
-                                loadedModel.getTexturePointCount(), // количество текстурных координат
-                                loadedModel.getNormalCount(), // количество нормалей
-                                loadedModel.getPolygonCount())); // количество полигонов
+                        String.format("Модель загружена!\nВершин: %d\nПолигонов: %d",
+                                wrapper.getOriginalModel().getVertexCount(),
+                                wrapper.getOriginalModel().getPolygonCount()));
+            });
 
-                updateStatistics(); // обновляем статистику в статус баре
+            loadTask.setOnFailed(event -> {
+                showLoadingIndicator(false);
+                ErrorHandler.handleException(loadTask.getException(), "загрузка модели");
+            });
 
-            } catch (IOException e) {
-                ErrorHandler.handleException(e, "загрузка OBJ файла");
-            } catch (Exception e) {
-                ErrorHandler.handleException(e, "непредвиденная ошибка при загрузке");
-            }
+            new Thread(loadTask).start();
         }
     }
 
     private void saveModel() { // сохранение модели в файл
         Model3D activeModel = selectionManager.getActiveModel(); // получаем активную модель
         if (activeModel != null) { // если есть что сохранять
+            ModelWrapper selectedWrapper = null;
+            for (ModelWrapper wrapper : sceneManager.getModelWrappers()) {
+                if (wrapper.getUIModel() == activeModel) {
+                    selectedWrapper = wrapper;
+                    break;
+                }
+            }
+
+            if (selectedWrapper == null) {
+                ErrorHandler.handleWarning("Модель не найдена", "сохранение");
+                return;
+            }
+
             FileChooser fileChooser = new FileChooser(); // диалог сохранения
             fileChooser.getExtensionFilters().add(
                     new FileChooser.ExtensionFilter("OBJ Files", "*.obj"));
@@ -425,6 +512,11 @@ public class MainApplication extends Application {
             if (file != null) {
                 try {
                     boolean applyTransformations = DialogHelper.showSaveOptionsDialog();// спрашиваем пользователя, как сохранять
+
+                    if (applyTransformations) {
+                        applyTransformationsToOriginalModel(selectedWrapper);
+                        selectedWrapper.updateUIModel(); // синхронизируем UI
+                    }
 
                     ObjWriter objWriter = new ObjWriter();// создаём и используем ObjWriter
                     objWriter.writeModel(activeModel, file.getAbsolutePath(), applyTransformations);
@@ -456,9 +548,31 @@ public class MainApplication extends Application {
     }
 
     private void addTestModel() { // добавление тестовой модели
-        Model3D testModel = new Model3D("Test Model " + (sceneManager.getModelWrappers().size() + 1)); // создаем модель
-        ModelWrapper wrapper = new ModelWrapper(null, testModel.nameProperty().get()); // создаем обертку (без данных)
-        sceneManager.addModelWrapper(wrapper); // добавляем на сцену
+        try {
+            String filePath = "C:/Users/Александр/Desktop/for3person/LIA_team/src/test/test_cube.obj";
+
+            ObjReader reader = new ObjReader();
+            Model originalModel = reader.readModel(filePath);
+
+            Triangulator triangulator = new Triangulator();
+            triangulator.triangulateModel(originalModel);
+
+            String name = "Cube from file " + (sceneManager.getModelWrappers().size() + 1);
+            ModelWrapper wrapper = new ModelWrapper(originalModel, name);
+
+            sceneManager.addModelWrapper(wrapper);
+
+            if (renderPanel != null) {
+                List<Model3D> models = sceneManager.getModelWrappers().stream()
+                        .map(ModelWrapper::getUIModel)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                renderPanel.setModels(models);
+            }
+
+        } catch (Exception e) {
+            ErrorHandler.handleException(e, "загрузка тестовой модели");
+        }
     }
 
     private void removeSelectedModel() { // удаление выбранной модели
@@ -578,19 +692,103 @@ public class MainApplication extends Application {
         }
     }
 
-    private void updateStatusBarTextureInfo() { // обновляет информацию о текстуре в статус баре
-        HBox statusBar = (HBox) primaryStage.getScene().lookup("#status-bar");
-        if (statusBar == null) return;
+    private void applyTransformationsToOriginalModel(ModelWrapper wrapper) {
+        Model3D uiModel = wrapper.getUIModel();
+        Model originalModel = wrapper.getOriginalModel();
 
-        Label textureInfoLabel = (Label) statusBar.lookup("#texture-info");
-        if (textureInfoLabel != null) {
-            if (currentTexture != null) {
-                textureInfoLabel.setText("Текстура: " + textureFileName +
-                        " (" + (int)currentTexture.getWidth() + "x" + (int)currentTexture.getHeight() + ")");
-                textureInfoLabel.setTextFill(Color.GREEN);
-            } else {
-                textureInfoLabel.setText("Текстура: не загружена");
-                textureInfoLabel.setTextFill(Color.GRAY);
+        ModelTransform transform = new ModelTransform();
+        transform.setTranslation(
+                (float) uiModel.translateXProperty().get(),
+                (float) uiModel.translateYProperty().get(),
+                (float) uiModel.translateZProperty().get()
+        );
+        transform.setRotationDeg(
+                (float) uiModel.rotateXProperty().get(),
+                (float) uiModel.rotateYProperty().get(),
+                (float) uiModel.rotateZProperty().get()
+        );
+        transform.setScale(
+                (float) uiModel.scaleXProperty().get(),
+                (float) uiModel.scaleYProperty().get(),
+                (float) uiModel.scaleZProperty().get()
+        );
+
+        for (int i = 0; i < originalModel.getVertices().size(); i++) {
+            Vector3D oldVertex = originalModel.getVertices().get(i);
+
+            Vector3D mathVertex = new Vector3D(
+                    (float) oldVertex.getX(),
+                    (float) oldVertex.getY(),
+                    (float) oldVertex.getZ()
+            );
+
+            Vector3D transformed = transform.transformVertex(mathVertex);
+
+            originalModel.getVertices().set(i,
+                    new Vector3D(
+                            transformed.getX(),
+                            transformed.getY(),
+                            transformed.getZ()
+                    )
+            );
+        }
+
+        NormalCalculator calc = new NormalCalculator();
+        calc.calculateNormals(originalModel);
+    }
+
+    private void showLoadingIndicator(boolean show) {
+        if (show) {
+            if (loadingStage == null) {
+                loadingStage = new Stage();
+                loadingStage.initOwner(primaryStage);
+                loadingStage.initModality(Modality.APPLICATION_MODAL);
+                loadingStage.setTitle("Загрузка...");
+
+                Label label = new Label("Загрузка модели, пожалуйста, подождите...");
+                label.setPadding(new Insets(20));
+
+                Scene scene = new Scene(new StackPane(label), 300, 100);
+                loadingStage.setScene(scene);
+                loadingStage.setResizable(false);
+            }
+            loadingStage.show();
+        } else {
+            if (loadingStage != null) {
+                loadingStage.close();
+            }
+        }
+    }
+
+    /**
+     * Создаёт UV-координаты по умолчанию для модели (плоская проекция по XY)
+     */
+    private void createDefaultUVCoordinates(Model3D model) {
+        List<Vector3D> vertices = model.getVertices();
+
+        if (vertices.isEmpty()) return;
+
+        double minX = vertices.stream().mapToDouble(v -> v.getX()).min().orElse(0.0);
+        double maxX = vertices.stream().mapToDouble(v -> v.getX()).max().orElse(1.0);
+        double minY = vertices.stream().mapToDouble(v -> v.getY()).min().orElse(0.0);
+        double maxY = vertices.stream().mapToDouble(v -> v.getY()).max().orElse(1.0);
+
+        double rangeX = Math.max(1e-6, maxX - minX);
+        double rangeY = Math.max(1e-6, maxY - minY);
+
+        model.clearTextureCoords();
+
+        for (Vector3D vertex : vertices) {
+            double u = (vertex.getX() - minX) / rangeX;
+            double v = (vertex.getY() - minY) / rangeY;
+            model.addTextureCoord(u, v);
+        }
+
+        for (Polygon polygon : model.getPolygons()) {
+            if (polygon.getTextureIndices().isEmpty()) {
+                for (int i = 0; i < polygon.getVertexIndices().size(); i++) {
+                    polygon.addTextureIndex(i);
+                }
             }
         }
     }

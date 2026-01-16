@@ -1,7 +1,7 @@
 package scene_master.writer;
 
+import math.LinealAlgebra.Vector3D;
 import scene_master.model.Model3D;
-import scene_master.model.Vertex;
 import scene_master.model.TexturePoint;
 import scene_master.model.Polygon;
 
@@ -48,12 +48,12 @@ public class ObjWriter {
             writer.write("# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n");
 
             writer.write("# Вершины (v x y z)\n");// зписываем вершины
-            List<Vertex> vertices = model.getVertices();
+            List<Vector3D> vertices = model.getVertices();
             for (int i = 0; i < vertices.size(); i++) {
-                Vertex vertex = vertices.get(i);
-                double x = vertex.x;
-                double y = vertex.y;
-                double z = vertex.z;
+                Vector3D vertex = vertices.get(i);
+                double x = vertex.getX();
+                double y = vertex.getY();
+                double z = vertex.getZ();
 
                 if (applyTransformations) {
                     // здесь будет код применения трансформаций (когда 2-й человек реализует)
@@ -74,13 +74,13 @@ public class ObjWriter {
                 }
             }
 
-            List<Vertex> normals = model.getNormals();// записываем нормали
+            List<Vector3D> normals = model.getNormals();// записываем нормали
             if (!normals.isEmpty()) {
                 writer.write("\n# Нормали вершин (vn x y z)\n");
                 for (int i = 0; i < normals.size(); i++) {
-                    Vertex normal = normals.get(i);
+                    Vector3D normal = normals.get(i);
                     writer.write(String.format("# Нормаль %d\n", i + 1));
-                    writer.write(String.format("vn %.6f %.6f %.6f\n", normal.x, normal.y, normal.z));
+                    writer.write(String.format("vn %.6f %.6f %.6f\n", normal.getX(), normal.getY(), normal.getZ()));
                 }
             }
 

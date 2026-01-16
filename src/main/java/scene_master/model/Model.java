@@ -2,6 +2,8 @@ package scene_master.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import math.LinealAlgebra.Vector3D;
+
 
 public class Model {
     private final List<Vector3D> vertices = new ArrayList<>();

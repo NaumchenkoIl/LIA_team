@@ -2,6 +2,9 @@ package scene_master.model;
 
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import math.LinealAlgebra.Vector3D;
+import scene_master.calculator.NormalCalculator;
+import scene_master.calculator.Triangulator;
 
 public class ModelWrapper {
     private final Model originalModel; // оригинальная модель данных (из ObjReader)
@@ -11,6 +14,12 @@ public class ModelWrapper {
     public ModelWrapper(Model model, String name) { // конструктор
         this.originalModel = model; // сохраняем оригинальную модель
         this.name.set(name); // устанавливаем имя
+        if (model != null) {
+            Triangulator triangulator = new Triangulator();
+            NormalCalculator normalCalculator = new NormalCalculator();
+            triangulator.triangulateModel(model);
+            normalCalculator.calculateNormals(model);
+        }
         this.uiModel = convertToUIModel(model); // конвертируем в ui-представление
     }
 
@@ -19,16 +28,22 @@ public class ModelWrapper {
 
         if (model != null) { // если есть данные для конвертации
             for (Vector3D vertex : model.getVertices()) {// конвертируем вершины
-                uiModel.getVertices().add(vertex.toVertex()); // преобразуем Vector3D в Vertex
-            }
+                uiModel.getVertices().add(new Vector3D(
+                        vertex.getX(),
+                        vertex.getY(),
+                        vertex.getZ()
+                ));            }
 
             for (TexturePoint tp : model.getTexturePoints()) {// конвертируем текстурные координаты
                 uiModel.getTexturePoints().add(tp);
             }
 
             for (Vector3D normal : model.getNormals()) {// кнвертируем нормали
-                uiModel.getNormals().add(normal.toVertex());
-            }
+                uiModel.getNormals().add(new Vector3D(
+                        normal.getX(),
+                        normal.getY(),
+                        normal.getZ()
+                ));            }
 
             for (scene_master.model.Polygon polygon : model.getPolygons()) { // конвертируем полигоны
                 int[] indices = polygon.getVertexIndicesArray();
@@ -70,16 +85,22 @@ public class ModelWrapper {
         uiModel.getPolygons().clear();
 
         for (Vector3D vertex : originalModel.getVertices()) {// вершины
-            uiModel.getVertices().add(vertex.toVertex());
-        }
+            uiModel.getVertices().add(new Vector3D(
+                    vertex.getX(),
+                    vertex.getY(),
+                    vertex.getZ()
+            ));        }
 
         for (TexturePoint tp : originalModel.getTexturePoints()) { // текстуры
             uiModel.getTexturePoints().add(tp);
         }
 
         for (Vector3D normal : originalModel.getNormals()) {// нормали
-            uiModel.getNormals().add(normal.toVertex());
-        }
+            uiModel.getNormals().add(new Vector3D(
+                    normal.getX(),
+                    normal.getY(),
+                    normal.getZ()
+            ));        }
 
         for (scene_master.model.Polygon polygon : originalModel.getPolygons()) { // полигоны
             int[] indices = polygon.getVertexIndicesArray();

@@ -1,7 +1,8 @@
 package scene_master.reader;
 
 import scene_master.model.Model;
-import scene_master.model.Vector3D;
+import math.LinealAlgebra.Vector3D;
+import scene_master.model.Polygon;
 import scene_master.model.TexturePoint;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -61,7 +62,7 @@ public class ObjReader {
         double y = parseDouble(tokens[2]);
         double z = parseDouble(tokens[3]);
 
-        model.addVertex(new Vector3D(x, y, z));
+        model.addVertex(new Vector3D((float) x, (float) y, (float) z));
     }
 
     private void parseTexture(String[] tokens, Model model, int lineNumber) {
@@ -84,7 +85,7 @@ public class ObjReader {
         double y = parseDouble(tokens[2]);
         double z = parseDouble(tokens[3]);
 
-        model.addNormal(new Vector3D(x, y, z));
+        model.addNormal(new Vector3D((float) x, (float) y, (float) z));
     }
 
     private void parseFace(String[] tokens, Model model, int lineNumber) {
@@ -95,6 +96,7 @@ public class ObjReader {
         List<Integer> vertexIndices = new ArrayList<>();
         List<Integer> textureIndices = new ArrayList<>();
         List<Integer> normalIndices = new ArrayList<>();
+        List<TexturePoint> texturePoints = model.getTexturePoints();
 
         for (int i = 1; i < tokens.length; i++) {
             String vertexToken = tokens[i];
@@ -102,6 +104,12 @@ public class ObjReader {
 
             int vertexIndex = parseInteger(parts[0]);// индекс вершины (обязательный)
             vertexIndices.add(convertIndex(vertexIndex, model.getVertices().size(), "вершины", lineNumber));
+
+            if (parts.length > 1 && !parts[1].isEmpty()) {
+                int texIndex = parseInteger(parts[1]);
+                int actualTexIndex = convertIndex(texIndex, texturePoints.size(), "texture", lineNumber);
+                textureIndices.add(actualTexIndex);
+            }
 
             if (parts.length >= 2 && !parts[1].isEmpty()) {// индекс текстуры (опциональный)
                 int textureIndex = parseInteger(parts[1]);
@@ -114,7 +122,11 @@ public class ObjReader {
             }
         }
 
-        scene_master.model.Polygon polygon = new scene_master.model.Polygon(vertexIndices);
+        Polygon polygon = new Polygon(vertexIndices);
+
+        if (!textureIndices.isEmpty()) {
+            polygon.setTextureIndices(textureIndices);
+        }
 
         if (!textureIndices.isEmpty()) {// сохраняем текстуры, если они есть
             polygon.setTextureIndices(textureIndices);
