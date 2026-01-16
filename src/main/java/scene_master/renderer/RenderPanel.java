@@ -29,25 +29,21 @@ public class RenderPanel extends Pane {
     private Color selectedVertexColor = Color.RED;
 
     public RenderPanel(double width, double height) {
-        // 1. Создаём Canvas
         canvas = new Canvas(width, height);
         getChildren().add(canvas);
 
-        // 2. Привязываем размеры
         canvas.widthProperty().bind(this.widthProperty());
         canvas.heightProperty().bind(this.heightProperty());
 
         camera = new Camera(new Vector3D(0, 0, 5), new Vector3D(0, 0, 0));
+
         renderer = new SoftwareRenderer(canvas, camera);
 
-        // 5. Настраиваем обработчики
         setupMouseHandlers();
 
         setFocusTraversable(true);
         canvas.setOnMouseClicked(e -> requestFocus());
     }
-        canvas.setOnMouseClicked(e -> requestFocus());}
-
 
     public void setModels(List<Model3D> models) {
         this.models = models;
@@ -109,7 +105,7 @@ public class RenderPanel extends Pane {
                                 Math.pow(screen[1] - mouseY, 2)
                 );
 
-                if (distance < minDistance && distance < 20) { // 20 пикселей - радиус выбора
+                if (distance < minDistance && distance < 20) {
                     minDistance = distance;
                     closestVertexIndex = i;
                     closestModel = model;
@@ -129,7 +125,7 @@ public class RenderPanel extends Pane {
         double centerY = canvas.getHeight() / 2;
 
         double screenX = centerX + vertex[0] * scale;
-        double screenY = centerY - vertex[1] * scale; // Инвертируем Y
+        double screenY = centerY - vertex[1] * scale;
 
         return new double[]{screenX, screenY};
     }
@@ -180,7 +176,6 @@ public class RenderPanel extends Pane {
                 Vector3D vertex = model.getVertices().get(i);
                 double[] transformed = renderer.transformVertex(vertex,
                         tx, ty, tz, rx, ry, rz, sx, sy, sz);
-
                 double[] screen = projectVertex(transformed);
 
                 Color currentVertexColor = editModeEnabled ? selectedVertexColor : vertexColor;
@@ -189,7 +184,6 @@ public class RenderPanel extends Pane {
                 gc.fillOval(screen[0] - vertexSize/2, screen[1] - vertexSize/2,
                         vertexSize, vertexSize);
 
-                // Обводка
                 gc.setStroke(Color.BLACK);
                 gc.setLineWidth(1);
                 gc.strokeOval(screen[0] - vertexSize/2, screen[1] - vertexSize/2,
@@ -236,7 +230,6 @@ public class RenderPanel extends Pane {
             Vector3D center = new Vector3D((float)centerX, (float)centerY, (float)centerZ);
             double[] transformed = renderer.transformVertex(center,
                     tx, ty, tz, rx, ry, rz, sx, sy, sz);
-
             double[] screen = projectVertex(transformed);
 
             gc.setFill(Color.LIMEGREEN);
@@ -263,13 +256,8 @@ public class RenderPanel extends Pane {
         render();
     }
 
-
     public void setUseLighting(boolean useLighting) {
         this.useLighting = useLighting;
-        if (renderer != null) {
-            renderer.setUseLighting(useLighting);
-            render();
-        }
         render();
     }
 
@@ -307,53 +295,18 @@ public class RenderPanel extends Pane {
         render();
     }
 
-    public void setLightDirection(double x, double y, double z) {
-        renderer.setLightDirection(x, y, z);
-        render();
-    }
-
     public void setBackgroundColor(Color color) {
         renderer.setBackgroundColor(color);
         render();
     }
 
-
-    public Canvas getCanvas() {
-        return canvas;
-    }
-
-    public double getAmbientLight() {
-        return renderer.getAmbientLight();
-    }
-
-    public double getDiffuseIntensity() {
-        return renderer.getDiffuseIntensity();
-    }
-
-    public boolean isRenderWireframe() {
-        return renderWireframe;
-    }
-
-    public boolean isShowVertices() {
-        return showVertices;
-    }
-
-    public boolean isUseTexture() {
-        return useTexture;
-    }
-
-    public boolean isUseLighting() {
-        return useLighting;
-    }
-
-    public boolean isEditModeEnabled() {
-        return editModeEnabled;
-    }
-
-    public SoftwareRenderer getRenderer() {
-        return renderer;
-    }
-
-    public void renderScene(List<Model3D> models, double camX, double camY, double camZ, double camRotY) {
-    }
+    public Canvas getCanvas() { return canvas; }
+    public double getAmbientLight() { return renderer.getAmbientLight(); }
+    public double getDiffuseIntensity() { return renderer.getDiffuseIntensity(); }
+    public boolean isRenderWireframe() { return renderWireframe; }
+    public boolean isShowVertices() { return showVertices; }
+    public boolean isUseTexture() { return useTexture; }
+    public boolean isUseLighting() { return useLighting; }
+    public boolean isEditModeEnabled() { return editModeEnabled; }
+    public SoftwareRenderer getRenderer() { return renderer; }
 }

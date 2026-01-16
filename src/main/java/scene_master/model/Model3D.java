@@ -7,15 +7,8 @@ import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import math.LinealAlgebra.Vector3D;
 
-import java.util.List;
-
-import javafx.scene.image.Image;
-import javafx.scene.paint.Color;
-import math.LinealAlgebra.Vector3D;
-
 import java.util.ArrayList;
 import java.util.List;
-
 
 public class Model3D {
     private final StringProperty name = new SimpleStringProperty();
@@ -44,21 +37,23 @@ public class Model3D {
         this.name.set(name);
     }
 
-    public ObjectProperty<Image> textureProperty() { return  texture; }
-
+    // Текстура
+    public ObjectProperty<Image> textureProperty() { return texture; }
     public Image getTexture() { return texture.get(); }
-
     public void setTexture(Image texture) { this.texture.set(texture); }
 
+    // UV-координаты
     public void addTextureCoord(double u, double v) {
         textureCoords.add(new TextureCoordinate(u, v));
     }
 
     public ObservableList<TextureCoordinate> getTextureCoords() {
-        return this.textureCoords;
+        return textureCoords;
     }
 
-    public void clearTextureCoords() { textureCoords.clear(); }
+    public void clearTextureCoords() {
+        textureCoords.clear();
+    }
 
     public double[] getTextureCoordsForPolygonVertex(Polygon polygon, int vertexIndexInPolygon) {
         try {
@@ -92,57 +87,40 @@ public class Model3D {
         return new double[]{0.5, 0.5};
     }
 
+    // Цвет
     public ObjectProperty<Color> baseColorProperty() { return baseColor; }
     public Color getBaseColor() { return baseColor.get(); }
     public void setBaseColor(Color color) { baseColor.set(color); }
 
-    public ObjectProperty<Image> textureProperty() { return  texture; }
+    // Свойства модели
+    public StringProperty nameProperty() { return name; }
+    public BooleanProperty visibleProperty() { return visible; }
+    public ObservableList<Vector3D> getVertices() { return vertices; }
+    public ObservableList<TexturePoint> getTexturePoints() { return texturePoints; }
+    public ObservableList<Vector3D> getNormals() { return normals; }
+    public ObservableList<Polygon> getPolygons() { return polygons; }
 
-    public Image getTexture() { return texture.get(); }
+    // Трансформации
+    public DoubleProperty translateXProperty() { return translateX; }
+    public DoubleProperty translateYProperty() { return translateY; }
+    public DoubleProperty translateZProperty() { return translateZ; }
+    public DoubleProperty rotateXProperty() { return rotateX; }
+    public DoubleProperty rotateYProperty() { return rotateY; }
+    public DoubleProperty rotateZProperty() { return rotateZ; }
+    public DoubleProperty scaleXProperty() { return scaleX; }
+    public DoubleProperty scaleYProperty() { return scaleY; }
+    public DoubleProperty scaleZProperty() { return scaleZ; }
 
-    public void setTexture(Image texture) { this.texture.set(texture); }
+    public String getName() { return name.get(); }
+    public boolean isVisible() { return visible.get(); }
 
-    public void addTextureCoord(double u, double v) {
-        textureCoords.add(new TextureCoordinate(u, v));
-    }
-
-    public ObservableList<TextureCoordinate> getTextureCoords() {
-        return this.textureCoords;
-    }
-
-    public void clearTextureCoords() { textureCoords.clear(); }
-
-    public double[] getTextureCoordsForPolygonVertex(Polygon polygon, int vertexIndexInPolygon) {
-        try {
-            List<Integer> indices = polygon.getVertexIndices();
-            List<Integer> texIndices = polygon.getTextureIndices();
-
-            if (texIndices != null && texIndices.size() > vertexIndexInPolygon) {
-                int texIndex = texIndices.get(vertexIndexInPolygon);
-                if (texIndex >= 0 && texIndex < textureCoords.size()) {
-                    TextureCoordinate tc = textureCoords.get(texIndex);
-                    return new double[]{tc.u, tc.v};
-                }
-            }
-
-            if (vertexIndexInPolygon < indices.size()) {
-                int vertexIndex = indices.get(vertexIndexInPolygon);
-                if (vertexIndex < vertices.size()) {
-                    Vector3D vertex = vertices.get(vertexIndex);
-                    double u = (vertex.getX() + 1) / 2;
-                    double v = (vertex.getY() + 1) / 2;
-
-                    u *= getTextureScaleU();
-                    v *= getTextureScaleV();
-
-                    return new double[]{u, v};
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return new double[]{0.5, 0.5};
-    }
+    // Масштабирование текстуры
+    public DoubleProperty textureScaleUProperty() { return textureScaleU; }
+    public DoubleProperty textureScaleVProperty() { return textureScaleV; }
+    public double getTextureScaleU() { return textureScaleU.get(); }
+    public double getTextureScaleV() { return textureScaleV.get(); }
+    public void setTextureScaleU(double scale) { textureScaleU.set(scale); }
+    public void setTextureScaleV(double scale) { textureScaleV.set(scale); }
 
     public void calculateVertexNormals() {
         vertexNormals.clear();
@@ -171,111 +149,23 @@ public class Model3D {
             double len = Math.sqrt(n.getX()*n.getX() + n.getY()*n.getY() + n.getZ()*n.getZ());
             if (len > 0) {
                 vertexNormals.set(i, new Vector3D(
-                        (float) (n.getX()/len), (float) (n.getY()/len), (float) (n.getZ()/len)
+                        (float) (n.getX()/len),
+                        (float) (n.getY()/len),
+                        (float) (n.getZ()/len)
                 ));
             }
         }
     }
 
-    public ObjectProperty<Color> baseColorProperty() { return baseColor; }
-    public Color getBaseColor() { return baseColor.get(); }
-    public void setBaseColor(Color color) { baseColor.set(color); }
-
-    public StringProperty nameProperty() {
-        return this.name;
-    }
-
-    public BooleanProperty visibleProperty() {
-        return this.visible;
-    }
-
-    public ObservableList<Vector3D> getVertices() {
-        return this.vertices;
-    }
-
-    public ObservableList<TexturePoint> getTexturePoints() {
-        return this.texturePoints;
-    }
-
-    public ObservableList<Vector3D> getNormals() {
-        return this.normals;
-    }
-
-    public ObservableList<Polygon> getPolygons() {
-        return this.polygons;
-    }
-
-    public DoubleProperty translateXProperty() {
-        return this.translateX;
-    }
-
-    public DoubleProperty translateYProperty() {
-        return this.translateY;
-    }
-
-    public DoubleProperty translateZProperty() {
-        return this.translateZ;
-    }
-
-    public DoubleProperty rotateXProperty() {
-        return this.rotateX;
-    }
-
-    public DoubleProperty rotateYProperty() {
-        return this.rotateY;
-    }
-
-    public DoubleProperty rotateZProperty() {
-        return this.rotateZ;
-    }
-
-    public DoubleProperty scaleXProperty() {
-        return this.scaleX;
-    }
-
-    public DoubleProperty scaleYProperty() {
-        return this.scaleY;
-    }
-
-    public DoubleProperty scaleZProperty() {
-        return this.scaleZ;
-    }
-
-    public String getName() {
-        return this.name.get();
-    }
-
-    public boolean isVisible() {
-        return this.visible.get();
+    public List<Vector3D> getVertexNormals() {
+        return vertexNormals;
     }
 
     public static class TextureCoordinate {
         public final double u, v;
-        public TextureCoordinate(double u, double v){
+        public TextureCoordinate(double u, double v) {
             this.u = u;
             this.v = v;
         }
     }
-
-    public DoubleProperty textureScaleUProperty() { return textureScaleU; }
-    public DoubleProperty textureScaleVProperty() { return textureScaleV; }
-    public double getTextureScaleU() { return textureScaleU.get(); }
-    public double getTextureScaleV() { return textureScaleV.get(); }
-    public void setTextureScaleU(double scale) { textureScaleU.set(scale); }
-    public void setTextureScaleV(double scale) { textureScaleV.set(scale); }
-
-    public static class TextureCoordinate {
-        public final double u, v;
-        public TextureCoordinate(double u, double v){
-            this.u = u;
-            this.v = v;
-        }
-    }
-    public List<Vector3D> getVertexNormals() { return vertexNormals; }
-    public DoubleProperty textureScaleUProperty() { return textureScaleU; }
-    public DoubleProperty textureScaleVProperty() { return textureScaleV; }
-    public double getTextureScaleU() { return textureScaleU.get(); }
-    public double getTextureScaleV() { return textureScaleV.get(); }
-    public void setTextureScaleU(double scale) { textureScaleU.set(scale); }
-    public void setTextureScaleV(double scale) { textureScaleV.set(scale); }
 }
