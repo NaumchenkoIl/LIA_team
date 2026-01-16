@@ -14,7 +14,7 @@ public class TextureManager {
     private static TextureManager instance;
     private final Map<String, Image> textures = new HashMap<>();
     private final Map<String, int[][]> textureData = new HashMap<>();
-
+    private static final Map<String, Image> textureCache = new HashMap<>();
     private Image defaultTexture;
 
     private TextureManager() {
@@ -46,19 +46,16 @@ public class TextureManager {
         cacheTextureData("default", defaultTexture);
     }
 
-    public Image loadTexture(File file) throws IOException {
+
+    public Image loadTexture(File file) {
         String path = file.getAbsolutePath();
-
-        if (textures.containsKey(path)) {
-            return textures.get(path);
+        if (textureCache.containsKey(path)) {
+            return textureCache.get(path);
         }
 
-        try (FileInputStream fis = new FileInputStream(file)) {
-            Image texture = new Image(fis);
-            textures.put(path, texture);
-            cacheTextureData(path, texture);
-            return texture;
-        }
+        Image texture = new Image(file.toURI().toString(), true);
+        textureCache.put(path, texture);
+        return texture;
     }
 
     public Image loadTexture(String resourcePath) {
@@ -94,18 +91,25 @@ public class TextureManager {
     }
 
     public Color getTextureColor(Image texture, double u, double v) {
-        if (texture == null) return Color.WHITE;
+        if (texture == null || texture.getPixelReader() == null) {
+            return Color.WHITE;
+        }
 
-        u = u - Math.floor(u);
-        v = v - Math.floor(v);
+        u = Math.max(0, Math.min(1, u));
+        v = Math.max(0, Math.min(1, v));
 
-        int x = (int) (u * (texture.getWidth() - 1));
-        int y = (int) ((1 - v) * (texture.getHeight() - 1));
+        int width = (int) texture.getWidth();
+        int height = (int) texture.getHeight();
 
-        x = Math.max(0, Math.min(x, (int) texture.getWidth() - 1));
-        y = Math.max(0, Math.min(y, (int) texture.getHeight() - 1));
+        if (width <= 0 || height <= 0) {
+            return Color.WHITE;
+        }
 
-        return texture.getPixelReader().getColor(x, y);
+        int x = (int) (u * (width - 1));
+        int y = (int) ((1 - v) * (height - 1));
+
+        javafx.scene.paint.Color fxColor = texture.getPixelReader().getColor(x, y);
+        return new Color(fxColor.getRed(), fxColor.getGreen(), fxColor.getBlue(), fxColor.getOpacity());
     }
 
     public int getTextureArgb(Image texture, double u, double v) {

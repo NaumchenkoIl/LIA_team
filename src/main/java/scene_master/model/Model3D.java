@@ -29,6 +29,8 @@ public class Model3D {
     private final ObjectProperty<Image> texture = new SimpleObjectProperty<>(null);
     private final ObjectProperty<Color> baseColor = new SimpleObjectProperty<>(Color.LIGHTBLUE);
     private final ObservableList<TextureCoordinate> textureCoords = FXCollections.observableArrayList();
+    private final DoubleProperty textureScaleU = new SimpleDoubleProperty(1.0);
+    private final DoubleProperty textureScaleV = new SimpleDoubleProperty(1.0);
 
     public Model3D(String name) {
         this.name.set(name);
@@ -40,7 +42,7 @@ public class Model3D {
 
     public void setTexture(Image texture) { this.texture.set(texture); }
 
-    public void addTectureCoord(double u, double v) {
+    public void addTextureCoord(double u, double v) {
         textureCoords.add(new TextureCoordinate(u, v));
     }
 
@@ -63,20 +65,23 @@ public class Model3D {
                 }
             }
 
-            // Запасной вариант: проекция по координатам
             if (vertexIndexInPolygon < indices.size()) {
                 int vertexIndex = indices.get(vertexIndexInPolygon);
                 if (vertexIndex < vertices.size()) {
                     Vector3D vertex = vertices.get(vertexIndex);
                     double u = (vertex.getX() + 1) / 2;
                     double v = (vertex.getY() + 1) / 2;
+
+                    u *= getTextureScaleU();
+                    v *= getTextureScaleV();
+
                     return new double[]{u, v};
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return new double[]{0.5, 0.5}; // fallback
+        return new double[]{0.5, 0.5};
     }
 
     public ObjectProperty<Color> baseColorProperty() { return baseColor; }
@@ -158,4 +163,11 @@ public class Model3D {
             this.v = v;
         }
     }
+
+    public DoubleProperty textureScaleUProperty() { return textureScaleU; }
+    public DoubleProperty textureScaleVProperty() { return textureScaleV; }
+    public double getTextureScaleU() { return textureScaleU.get(); }
+    public double getTextureScaleV() { return textureScaleV.get(); }
+    public void setTextureScaleU(double scale) { textureScaleU.set(scale); }
+    public void setTextureScaleV(double scale) { textureScaleV.set(scale); }
 }

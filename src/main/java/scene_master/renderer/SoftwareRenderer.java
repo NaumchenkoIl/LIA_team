@@ -34,6 +34,8 @@ public class SoftwareRenderer {
     private Color backgroundColor = Color.BLACK;
 
     private int debugTriangleCount = 0;
+    private long lastRenderTime = 0;
+    private static final long MIN_RENDER_INTERVAL = 16;
 
     public SoftwareRenderer(Canvas canvas) {
         this.canvas = canvas;
@@ -91,18 +93,30 @@ public class SoftwareRenderer {
      * Рендеринг сцены со всеми моделями
      */
     public void renderScene(List<Model3D> models) {
-        clear();
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastRenderTime < MIN_RENDER_INTERVAL) {
+            return;
+        }
+        lastRenderTime = currentTime;
 
+        clear();
         debugTriangleCount = 0;
 
         double cameraX = 0;
         double cameraY = 0;
         double cameraZ = 5;
-        double fov = 60; // поле зрения
+        double fov = 60;
         double aspectRatio = (double) width / height;
 
         for (Model3D model : models) {
             if (!model.isVisible()) continue;
+
+            boolean textureReady = false;
+            if (useTexture && model.getTexture() != null) {
+                if (!model.getTexture().isBackgroundLoading() && !model.getTexture().isError()) {
+                    textureReady = true;
+                }
+            }
 
             double tx = model.translateXProperty().get();
             double ty = model.translateYProperty().get();
@@ -116,10 +130,7 @@ public class SoftwareRenderer {
 
             for (Polygon polygon : model.getPolygons()) {
                 List<Integer> indices = polygon.getVertexIndices();
-                if (indices.size() != 3) {
-                    System.err.println("Предупреждение: полигон не треугольник (" + indices.size() + " вершин)");
-                    continue;
-                }
+                if (indices.size() != 3) continue;
 
                 Vector3D v1 = model.getVertices().get(indices.get(0));
                 Vector3D v2 = model.getVertices().get(indices.get(1));
@@ -133,7 +144,7 @@ public class SoftwareRenderer {
                 double[] screen2 = projectToScreen(p2, cameraX, cameraY, cameraZ, fov, aspectRatio);
                 double[] screen3 = projectToScreen(p3, cameraX, cameraY, cameraZ, fov, aspectRatio);
 
-                renderTriangle(screen1, screen2, screen3, model, polygon);
+                renderTriangle(screen1, screen2, screen3, model, polygon, textureReady);
             }
         }
 
@@ -189,7 +200,7 @@ public class SoftwareRenderer {
      * Рендеринг одного треугольника
      */
     private void renderTriangle(double[] p1, double[] p2, double[] p3,
-                                Model3D model, Polygon polygon) {
+                                Model3D model, Polygon polygon, boolean textureReady) {
 
         double x1 = p1[0], y1 = p1[1], z1 = p1[2];
         double x2 = p2[0], y2 = p2[1], z2 = p2[2];
@@ -264,8 +275,16 @@ public class SoftwareRenderer {
                             };
                         }
 
-                        Color pixelColor = calculatePixelColor(model, u, v, interpolatedNormal);
-
+                        Color pixelColor;
+                        if (textureReady) {
+                            pixelColor = calculatePixelColor(model, u, v, interpolatedNormal);
+                        } else {
+                            // Используем базовый цвет без текстуры
+                            pixelColor = model.getBaseColor();
+                            if (useLighting && interpolatedNormal != null) {
+                                pixelColor = applyLightingToColor(pixelColor, interpolatedNormal);
+                            }
+                        }
                         gc.setFill(pixelColor);
                         gc.fillRect(x, y, 1, 1);
                     }

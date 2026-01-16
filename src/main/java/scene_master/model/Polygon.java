@@ -66,4 +66,7 @@ public class Polygon {
     public boolean hasNormals() {
         return !normalIndices.isEmpty();
     }
-}
+
+    public void addTextureIndex(int index) {
+        textureIndices.add(index);
+    }}
