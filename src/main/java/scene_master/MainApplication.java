@@ -138,8 +138,11 @@ public class MainApplication extends Application {
             useTextureItem.setDisable(!hasTexture);
         });
 
-      //  useTextureItem.setDisable(true); // пока недоступно, пока не реализован 3D вид
-        useLightingItem.setDisable(true); // пока недоступно
+        useLightingItem.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (renderPanel != null) {
+                renderPanel.setUseLighting(newVal);
+            }
+        });
 
         darkThemeItem.setOnAction(e -> switchTheme("dark"));
         lightThemeItem.setOnAction(e -> switchTheme("light"));
@@ -286,6 +289,14 @@ public class MainApplication extends Application {
         rightPanel.setPadding(new Insets(10)); // отступы
         rightPanel.setPrefWidth(300); //  ширина 300px
 
+        Slider ambientSlider = createSliderOnly("Ambient Light", 0, 1, 0.3);
+        Slider diffuseSlider = createSliderOnly("Diffuse Intensity", 0, 1, 0.7);
+
+        ambientSlider.valueProperty().addListener((obs, o, n) ->
+                renderPanel.setAmbientLight(n.doubleValue()));
+        diffuseSlider.valueProperty().addListener((obs, o, n) ->
+                renderPanel.setDiffuseIntensity(n.doubleValue()));
+
         Label propertiesLabel = new Label("Свойства модели");
         propertiesLabel.getStyleClass().add("section-label");
 
@@ -298,7 +309,10 @@ public class MainApplication extends Application {
         VBox transformsPanel = createTransformsPanel(); // создаем панель с ползунками трансформаций
 
         rightPanel.getChildren().addAll(propertiesLabel, modelPropertiesPanel, // собираем все элементы
-                new Separator(), transformLabel, transformsPanel); // разделитель и трансформации
+                new Separator(), transformLabel, transformsPanel,
+                new Label("Параметры освещения"),
+                new HBox(10, new Label("Ambient:"), ambientSlider),
+                new HBox(10, new Label("Diffuse:"), diffuseSlider)); // разделитель и трансформации
         return rightPanel; // возвращаем готовую панель
     }
 
@@ -336,6 +350,14 @@ public class MainApplication extends Application {
 
         hbox.getChildren().addAll(nameLabel, slider, valueLabel); // собираем элементы
         return hbox; // возвращаем готовый контрол
+    }
+
+    private Slider createSliderOnly(String label, double min, double max, double initial) {
+        Slider slider = new Slider(min, max, initial);
+        slider.setShowTickLabels(true);
+        slider.setShowTickMarks(true);
+        slider.setMajorTickUnit((max - min) / 4);
+        return slider;
     }
 
     private HBox createStatusBar() {
@@ -559,10 +581,7 @@ public class MainApplication extends Application {
             ModelWrapper wrapper = new ModelWrapper(originalModel, name);
 
             sceneManager.addModelWrapper(wrapper);
-
-           /* if (wrapper.getUIModel() != null) {
-                checkAndFixUVCoordinates(wrapper.getUIModel());
-            }*/
+            wrapper.getUIModel().calculateVertexNormals();
 
             if (renderPanel != null) {
                 List<Model3D> models = sceneManager.getModelWrappers().stream()

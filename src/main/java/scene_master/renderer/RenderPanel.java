@@ -21,20 +21,28 @@ public class RenderPanel extends Pane {
     private boolean useLighting = false;
 
     public RenderPanel(double width, double height) {
+        // 1. Создаём Canvas
         canvas = new Canvas(width, height);
         getChildren().add(canvas);
 
+        // 2. Привязываем размеры
         canvas.widthProperty().bind(this.widthProperty());
         canvas.heightProperty().bind(this.heightProperty());
 
-        camera = new Camera(new Vector3D(0, 0, 5), new Vector3D(0, 0, 0));
+        // 3. 🔥 СОЗДАЁМ КАМЕРУ
+        camera = new Camera(
+                new Vector3D(0, 0, 5),   // позиция камеры
+                new Vector3D(0, 0, 0)    // точка, на которую смотрит
+        );
+
+        // 4. 🔥 СОЗДАЁМ РЕНДЕРЕР (теперь camera != null)
         renderer = new SoftwareRenderer(canvas, camera);
 
+        // 5. Настраиваем обработчики
         setupMouseHandlers();
-
         setFocusTraversable(true);
-        canvas.setOnMouseClicked(e -> requestFocus());
-    }
+        canvas.setOnMouseClicked(e -> requestFocus());}
+
 
     public void setModels(List<Model3D> models) {
         this.models = models;
@@ -98,7 +106,10 @@ public class RenderPanel extends Pane {
 
     public void setUseLighting(boolean useLighting) {
         this.useLighting = useLighting;
-        render();
+        if (renderer != null) {
+            renderer.setUseLighting(useLighting);
+            render();
+        }
     }
 
     public void setAmbientLight(double ambient) {

@@ -1,6 +1,7 @@
 package scene_master.renderer;
 
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelWriter;
 import javafx.scene.input.KeyCode;
 import math.Camera;
 import math.CameraInputAdapter;
@@ -36,7 +37,7 @@ public class SoftwareRenderer {
     private double diffuseIntensity = 0.7;
     private double[] lightDirection = normalize(new double[]{0, -0.7, -0.7});
 
-    private Color backgroundColor = Color.BLACK;
+    private Color backgroundColor = Color.rgb(30, 30, 46);
 
     private int debugTriangleCount = 0;
     private long lastRenderTime = 0;
@@ -44,6 +45,8 @@ public class SoftwareRenderer {
 
     private Camera camera;
     private CameraInputAdapter cameraInputAdapter;
+    private WritableImage buffer;
+    private PixelWriter pixelWriter;
 
     public SoftwareRenderer(Canvas canvas, Camera camera) {
         this.canvas = canvas;
@@ -52,6 +55,9 @@ public class SoftwareRenderer {
         this.width = 800;
         this.height = 600;
         initZBuffer();
+
+        buffer = new WritableImage(width, height);
+        pixelWriter = buffer.getPixelWriter();
     }
 
     private void initZBuffer() {
@@ -111,6 +117,9 @@ public class SoftwareRenderer {
             this.width = currentWidth;
             this.height = currentHeight;
             initZBuffer();
+
+            buffer = new WritableImage(width, height);
+            pixelWriter = buffer.getPixelWriter();
         }
 
         this.gc = canvas.getGraphicsContext2D();
@@ -123,12 +132,18 @@ public class SoftwareRenderer {
         lastRenderTime = currentTime;
 
         camera.setAspectRatio((float) width / height);
-        clear();
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                pixelWriter.setColor(x, y, backgroundColor);
+            }
+        }
+        clearZBuffer();
+
         debugTriangleCount = 0;
 
         Matrix4x4 viewMatrix = camera.getViewMatrix();
         Matrix4x4 projectionMatrix = camera.getProjectionMatrix();
-
         for (Model3D model : models) {
             if (!model.isVisible()) continue;
 
@@ -169,8 +184,8 @@ public class SoftwareRenderer {
             }
         }
 
-        if (renderWireframe) {
-            renderWireframe(models);
+        if (gc != null) {
+            gc.drawImage(buffer, 0, 0);
         }
     }
 
@@ -220,8 +235,34 @@ public class SoftwareRenderer {
     /**
      * Рендеринг одного треугольника
      */
+    /**
+     * Рендеринг одного треугольника
+     */
     private void renderTriangle(double[] p1, double[] p2, double[] p3,
                                 Model3D model, Polygon polygon, boolean textureReady) {
+
+        Vector3D faceNormal = polygon.getNormal();
+        if (faceNormal == null) return;
+
+        List<Integer> indices = polygon.getVertexIndices();
+        if (indices.size() < 3) return;
+
+        Vector3D v1 = model.getVertices().get(indices.get(0));
+        Vector3D v2 = model.getVertices().get(indices.get(1));
+        Vector3D v3 = model.getVertices().get(indices.get(2));
+
+        Vector3D center = new Vector3D(
+                (v1.getX() + v2.getX() + v3.getX()) / 3.0f,
+                (v1.getY() + v2.getY() + v3.getY()) / 3.0f,
+                (v1.getZ() + v2.getZ() + v3.getZ()) / 3.0f
+        );
+
+        Vector3D viewDir = camera.getTarget().subtract(camera.getPosition()).normalize();
+
+        double dot = faceNormal.dot(viewDir);
+        if (dot <= 0) {
+            return;
+        }
 
         double x1 = p1[0], y1 = p1[1], z1 = p1[2];
         double x2 = p2[0], y2 = p2[1], z2 = p2[2];
@@ -249,17 +290,12 @@ public class SoftwareRenderer {
             System.out.println("UV1: [" + String.format("%.3f", uv1[0]) + ", " + String.format("%.3f", uv1[1]) + "]");
             System.out.println("UV2: [" + String.format("%.3f", uv2[0]) + ", " + String.format("%.3f", uv2[1]) + "]");
             System.out.println("UV3: [" + String.format("%.3f", uv3[0]) + ", " + String.format("%.3f", uv3[1]) + "]");
-
-            List<Integer> texIndices = polygon.getTextureIndices();
-            System.out.println("UV-индексов в полигоне: " +
-                    (texIndices != null ? texIndices.size() : 0));
-            System.out.println("Всего UV-координат в модели: " + model.getTextureCoords().size());
+            System.out.println("Нормаль: " + faceNormal.getX() + ", " + faceNormal.getY() + ", " + faceNormal.getZ());
         }
-
 
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
-                double w1 = edgeFunction(x2, y2, x3, y3, x, y) / area;
+                double w1 = edgeFunction( x2, y2, x3, y3, x, y) / area;
                 double w2 = edgeFunction(x3, y3, x1, y1, x, y) / area;
                 double w3 = edgeFunction(x1, y1, x2, y2, x, y) / area;
 
@@ -273,22 +309,19 @@ public class SoftwareRenderer {
                         double v = w1 * uv1[1] + w2 * uv2[1] + w3 * uv3[1];
 
                         double[] interpolatedNormal = null;
+                        List<Vector3D> vertexNormals = model.getVertexNormals();
 
-                        if (model instanceof Model3D) {
-                            Model3D model3d = (Model3D) model;
-                            double[] normal = null;
-                            if (polygon.getNormal() != null) {
-                                Vector3D faceNormal = polygon.getNormal();
-                                normal = new double[]{
-                                        faceNormal.getX(),
-                                        faceNormal.getY(),
-                                        faceNormal.getZ()
-                                };
-                            }
-                        }
+                        if (vertexNormals != null && vertexNormals.size() == model.getVertices().size()) {
+                            Vector3D n1 = vertexNormals.get(indices.get(0));
+                            Vector3D n2 = vertexNormals.get(indices.get(1));
+                            Vector3D n3 = vertexNormals.get(indices.get(2));
 
-                        if (interpolatedNormal == null && polygon.getNormal() != null) {
-                            Vector3D faceNormal = polygon.getNormal();
+                            interpolatedNormal = new double[]{
+                                    w1 * n1.getX() + w2 * n2.getX() + w3 * n3.getX(),
+                                    w1 * n1.getY() + w2 * n2.getY() + w3 * n3.getY(),
+                                    w1 * n1.getZ() + w2 * n2.getZ() + w3 * n3.getZ()
+                            };
+                        } else {
                             interpolatedNormal = new double[]{
                                     faceNormal.getX(),
                                     faceNormal.getY(),
@@ -300,22 +333,21 @@ public class SoftwareRenderer {
                         if (textureReady) {
                             pixelColor = calculatePixelColor(model, u, v, interpolatedNormal);
                         } else {
-                            // Используем базовый цвет без текстуры
                             pixelColor = model.getBaseColor();
                             if (useLighting && interpolatedNormal != null) {
                                 pixelColor = applyLightingToColor(pixelColor, interpolatedNormal);
                             }
                         }
-                        gc.setFill(pixelColor);
-                        gc.fillRect(x, y, 1, 1);
+
+                        pixelWriter.setColor(x, y, pixelColor);
                     }
                 }
             }
         }
     }
-
     /**
-     * Вычисление функции ребра для барицентрических координат
+     * Вычисляет значение функции ребра (edge function) для барицентрических координат.
+     * Используется для определения, находится ли точка (px, py) внутри треугольника.
      */
     private double edgeFunction(double ax, double ay, double bx, double by, double px, double py) {
         return (bx - ax) * (py - ay) - (by - ay) * (px - ax);
@@ -334,7 +366,10 @@ public class SoftwareRenderer {
         }
 
         if (useLighting && normal != null) {
+            System.out.println("Применяется освещение!"); // ← ДОБАВЬ ЭТО
             baseColor = applyLightingToColor(baseColor, normal);
+        } else {
+            System.out.println("Освещение выключено или нет нормали"); // ← И ЭТО
         }
 
         return baseColor;
@@ -348,23 +383,22 @@ public class SoftwareRenderer {
     private Color applyLightingToColor(Color color, double[] normal) {
         if (normal == null || !useLighting) return color;
 
-        double length = Math.sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
-        if (length > 0) {
-            normal[0] /= length;
-            normal[1] /= length;
-            normal[2] /= length;
+        double nx = normal[0], ny = normal[1], nz = normal[2];
+        double len = Math.sqrt(nx*nx + ny*ny + nz*nz);
+        if (len > 0) {
+            nx /= len; ny /= len; nz /= len;
         }
 
-        double[] lightDir = normalize(new double[]{0, -0.5, -1});
+        Vector3D lightDir = camera.getTarget().subtract(camera.getPosition()).normalize();
+        double lx = lightDir.getX();
+        double ly = lightDir.getY();
+        double lz = lightDir.getZ();
 
-        double dot = normal[0] * lightDir[0] +
-                normal[1] * lightDir[1] +
-                normal[2] * lightDir[2];
-
+        double dot = nx * lx + ny * ly + nz * lz;
         dot = Math.max(0, dot);
 
         double intensity = ambientLight + diffuseIntensity * dot;
-        intensity = Math.max(0.2, Math.min(1.0, intensity));
+        intensity = Math.max(0.1, Math.min(1.0, intensity));
 
         return color.deriveColor(0, 1.0, intensity, 1.0);
     }

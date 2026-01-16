@@ -21,6 +21,10 @@ public class ModelWrapper {
             normalCalculator.calculateNormals(model);
         }
         this.uiModel = convertToUIModel(model); // конвертируем в ui-представление
+
+        if (this.uiModel != null) {
+            this.uiModel.calculateVertexNormals();
+        }
     }
 
     private Model3D convertToUIModel(Model model) { // конвертирует Model в Model3D
@@ -38,14 +42,7 @@ public class ModelWrapper {
                 uiModel.getTexturePoints().add(tp);
             }
 
-            for (Vector3D normal : model.getNormals()) {// кнвертируем нормали
-                uiModel.getNormals().add(new Vector3D(
-                        normal.getX(),
-                        normal.getY(),
-                        normal.getZ()
-                ));            }
-
-            for (scene_master.model.Polygon polygon : model.getPolygons()) { // конвертируем полигоны
+            for (Polygon polygon : model.getPolygons()) { // конвертируем полигоны
                 int[] indices = polygon.getVertexIndicesArray();
                 Polygon uiPolygon = new Polygon(indices);
 
@@ -55,6 +52,10 @@ public class ModelWrapper {
 
                 if (polygon.hasNormals()) {// сохраняем нормали
                     uiPolygon.setNormalIndices(polygon.getNormalIndices());
+                }
+
+                if (polygon.getNormal() != null) {
+                    uiPolygon.setNormal(polygon.getNormal());
                 }
 
                 uiModel.getPolygons().add(uiPolygon);

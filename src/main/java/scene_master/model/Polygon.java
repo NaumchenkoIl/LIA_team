@@ -38,7 +38,7 @@ public class Polygon {
     }
 
     public Vector3D getNormal() {
-        return this.normal;
+        return normal;
     }
 
     public List<Integer> getTextureIndices() {

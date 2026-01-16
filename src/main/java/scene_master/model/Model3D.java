@@ -7,6 +7,7 @@ import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import math.LinealAlgebra.Vector3D;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -31,6 +32,7 @@ public class Model3D {
     private final ObservableList<TextureCoordinate> textureCoords = FXCollections.observableArrayList();
     private final DoubleProperty textureScaleU = new SimpleDoubleProperty(1.0);
     private final DoubleProperty textureScaleV = new SimpleDoubleProperty(1.0);
+    private List<Vector3D> vertexNormals = new ArrayList<>();
 
     public Model3D(String name) {
         this.name.set(name);
@@ -82,6 +84,39 @@ public class Model3D {
             e.printStackTrace();
         }
         return new double[]{0.5, 0.5};
+    }
+
+    public void calculateVertexNormals() {
+        vertexNormals.clear();
+        for (int i = 0; i < vertices.size(); i++) {
+            vertexNormals.add(new Vector3D(0, 0, 0));
+        }
+
+        for (Polygon polygon : polygons) {
+            Vector3D faceNormal = polygon.getNormal();
+            if (faceNormal != null) {
+                for (int idx : polygon.getVertexIndices()) {
+                    if (idx >= 0 && idx < vertexNormals.size()) {
+                        Vector3D current = vertexNormals.get(idx);
+                        vertexNormals.set(idx, new Vector3D(
+                                current.getX() + faceNormal.getX(),
+                                current.getY() + faceNormal.getY(),
+                                current.getZ() + faceNormal.getZ()
+                        ));
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < vertexNormals.size(); i++) {
+            Vector3D n = vertexNormals.get(i);
+            double len = Math.sqrt(n.getX()*n.getX() + n.getY()*n.getY() + n.getZ()*n.getZ());
+            if (len > 0) {
+                vertexNormals.set(i, new Vector3D(
+                        (float) (n.getX()/len), (float) (n.getY()/len), (float) (n.getZ()/len)
+                ));
+            }
+        }
     }
 
     public ObjectProperty<Color> baseColorProperty() { return baseColor; }
@@ -163,7 +198,7 @@ public class Model3D {
             this.v = v;
         }
     }
-
+    public List<Vector3D> getVertexNormals() { return vertexNormals; }
     public DoubleProperty textureScaleUProperty() { return textureScaleU; }
     public DoubleProperty textureScaleVProperty() { return textureScaleV; }
     public double getTextureScaleU() { return textureScaleU.get(); }
