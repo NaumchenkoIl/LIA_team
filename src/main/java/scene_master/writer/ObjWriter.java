@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 public class ObjWriter {
 
@@ -61,7 +62,7 @@ public class ObjWriter {
                     writer.write(String.format("# Вершина %d (оригинальные координаты)\n", i + 1));
                 }
 
-                writer.write(String.format("v %.6f %.6f %.6f\n", x, y, z));
+                writer.write(String.format(Locale.US, "v %.6f %.6f %.6f\n", x, y, z));
             }
 
             List<TexturePoint> texturePoints = model.getTexturePoints();// записываем текстурные координаты

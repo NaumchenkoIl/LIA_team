@@ -12,9 +12,9 @@ import scene_master.model.Polygon;
 import math.LinealAlgebra.Vector3D;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import math.ModelTransform;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
+
 import java.util.*;
 
 public class SoftwareRenderer {
@@ -24,8 +24,10 @@ public class SoftwareRenderer {
     private int height;
 
     private double[][] zBuffer;
+    private Color[][] frameBuffer;
 
     private boolean renderWireframe = false;
+    private boolean showVertices = false;
     private boolean useTexture = false;
     private boolean useLighting = false;
 
@@ -37,6 +39,8 @@ public class SoftwareRenderer {
     private double[] lightDirection = normalize(new double[]{0, -0.7, -0.7});
 
     private Color backgroundColor = Color.BLACK;
+    private Color vertexColor = Color.YELLOW;
+    private Color wireframeColor = Color.RED;
 
     private int debugTriangleCount = 0;
     private long lastRenderTime = 0;
@@ -45,24 +49,29 @@ public class SoftwareRenderer {
     private Camera camera;
     private CameraInputAdapter cameraInputAdapter;
 
+    // Для отладки
+    private boolean debugMode = false;
+
     public SoftwareRenderer(Canvas canvas, Camera camera) {
         this.canvas = canvas;
         this.camera = camera;
         this.cameraInputAdapter = new CameraInputAdapter(camera);
-        this.width = 800;
-        this.height = 600;
-        initZBuffer();
+        this.width = (int) canvas.getWidth();
+        this.height = (int) canvas.getHeight();
+        initBuffers();
     }
 
-    private void initZBuffer() {
+    private void initBuffers() {
         zBuffer = new double[width][height];
-        clearZBuffer();
+        frameBuffer = new Color[width][height];
+        clearBuffers();
     }
 
-    public void clearZBuffer() {
+    private void clearBuffers() {
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 zBuffer[x][y] = Double.POSITIVE_INFINITY;
+                frameBuffer[x][y] = backgroundColor;
             }
         }
     }
@@ -70,11 +79,15 @@ public class SoftwareRenderer {
     public void resize(int width, int height) {
         this.width = width;
         this.height = height;
-        initZBuffer();
+        initBuffers();
     }
 
     public void setRenderWireframe(boolean renderWireframe) {
         this.renderWireframe = renderWireframe;
+    }
+
+    public void setShowVertices(boolean showVertices) {
+        this.showVertices = showVertices;
     }
 
     public void setUseTexture(boolean useTexture) {
@@ -85,19 +98,27 @@ public class SoftwareRenderer {
         this.useLighting = useLighting;
     }
 
+    public void setVertexColor(Color color) {
+        this.vertexColor = color;
+    }
+
+    public void setWireframeColor(Color color) {
+        this.wireframeColor = color;
+    }
+
     public void setBackgroundColor(Color color) {
         this.backgroundColor = color;
     }
 
     /**
-     * Очистка экрана и Z-буфера
+     * Очистка экрана и буферов
      */
     public void clear() {
         if (gc != null) {
             gc.setFill(backgroundColor);
             gc.fillRect(0, 0, width, height);
         }
-        clearZBuffer();
+        clearBuffers();
     }
 
     /**
@@ -110,7 +131,7 @@ public class SoftwareRenderer {
         if (currentWidth != width || currentHeight != height) {
             this.width = currentWidth;
             this.height = currentHeight;
-            initZBuffer();
+            initBuffers();
         }
 
         this.gc = canvas.getGraphicsContext2D();
@@ -129,6 +150,7 @@ public class SoftwareRenderer {
         Matrix4x4 viewMatrix = camera.getViewMatrix();
         Matrix4x4 projectionMatrix = camera.getProjectionMatrix();
 
+        // Сначала рендерим все треугольники
         for (Model3D model : models) {
             if (!model.isVisible()) continue;
 
@@ -169,52 +191,93 @@ public class SoftwareRenderer {
             }
         }
 
+        // Рисуем каркас если нужно
         if (renderWireframe) {
             renderWireframe(models);
+        }
+
+        // Рисуем вершины если нужно
+        if (showVertices) {
+            renderVertices(models);
+        }
+
+        // Копируем frameBuffer на экран
+        drawFrameBuffer();
+    }
+
+    private void drawFrameBuffer() {
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (frameBuffer[x][y] != null && frameBuffer[x][y] != backgroundColor) {
+                    gc.setFill(frameBuffer[x][y]);
+                    gc.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+    }
+
+    private void renderVertices(List<Model3D> models) {
+        Matrix4x4 viewMatrix = camera.getViewMatrix();
+        Matrix4x4 projectionMatrix = camera.getProjectionMatrix();
+
+        for (Model3D model : models) {
+            if (!model.isVisible()) continue;
+
+            double tx = model.translateXProperty().get();
+            double ty = model.translateYProperty().get();
+            double tz = model.translateZProperty().get();
+            double rx = Math.toRadians(model.rotateXProperty().get());
+            double ry = Math.toRadians(model.rotateYProperty().get());
+            double rz = Math.toRadians(model.rotateZProperty().get());
+            double sx = model.scaleXProperty().get();
+            double sy = model.scaleYProperty().get();
+            double sz = model.scaleZProperty().get();
+
+            for (Vector3D vertex : model.getVertices()) {
+                double[] world = transformVertex(vertex, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                double[] screen = projectWithCamera(world, viewMatrix, projectionMatrix);
+
+                int x = (int) Math.round(screen[0]);
+                int y = (int) Math.round(screen[1]);
+
+                if (x >= 0 && x < width && y >= 0 && y < height && screen[2] < zBuffer[x][y] + 0.01) {
+                    // Рисуем вершину как маленький квадрат
+                    int size = 2;
+                    for (int dx = -size; dx <= size; dx++) {
+                        for (int dy = -size; dy <= size; dy++) {
+                            int px = x + dx;
+                            int py = y + dy;
+                            if (px >= 0 && px < width && py >= 0 && py < height) {
+                                frameBuffer[px][py] = vertexColor;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
     /**
      * Преобразование вершины с учетом трансформаций модели
      */
-    private double[] transformVertex(Vector3D v, double tx, double ty, double tz,
-                                     double rx, double ry, double rz,
-                                     double sx, double sy, double sz) {
+    public double[] transformVertex(Vector3D v, double tx, double ty, double tz,
+                                    double rx, double ry, double rz,
+                                    double sx, double sy, double sz) {
 
         ModelTransform transform = new ModelTransform();
         transform.setTranslation((float) tx, (float) ty, (float) tz);
-        transform.setRotationDeg((float) rx, (float) ry, (float) rz);
+        transform.setRotationDeg((float) Math.toDegrees(rx),
+                (float) Math.toDegrees(ry),
+                (float) Math.toDegrees(rz));
         transform.setScale((float) sx, (float) sy, (float) sz);
 
         Vector3D transformed = transform.transformVertex(v);
 
         return new double[]{
-            transformed.getX(),
-            transformed.getY(),
-            transformed.getZ()
+                transformed.getX(),
+                transformed.getY(),
+                transformed.getZ()
         };
-    }
-
-    /**
-     * Проекция 3D точки на 2D экран
-     */
-    private double[] projectToScreen(double[] point,
-                                     double camX, double camY, double camZ,
-                                     double fov, double aspectRatio) {
-        double x = point[0] - camX;
-        double y = point[1] - camY;
-        double z = point[2] - camZ;
-
-        double scale = 1.0 / Math.tan(Math.toRadians(fov) / 2.0);
-        double projectedX = (x * scale) / z;
-        double projectedY = (y * scale) / z;
-
-        projectedX /= aspectRatio;
-
-        double screenX = (projectedX + 1) * 0.5 * width;
-        double screenY = (1 - projectedY) * 0.5 * height;
-
-        return new double[]{screenX, screenY, z};
     }
 
     /**
@@ -241,21 +304,13 @@ public class SoftwareRenderer {
         double[] uv2 = model.getTextureCoordsForPolygonVertex(polygon, 1);
         double[] uv3 = model.getTextureCoordsForPolygonVertex(polygon, 2);
 
-        if (debugTriangleCount++ < 3) {
+        if (debugTriangleCount++ < 3 && debugMode) {
             System.out.println("=== Треугольник " + debugTriangleCount + " ===");
             System.out.println("Модель: " + model.getName());
-            System.out.println("Текстура: " + (model.getTexture() != null ? "Есть" : "Нет"));
-            System.out.println("Режим текстуры: " + useTexture);
             System.out.println("UV1: [" + String.format("%.3f", uv1[0]) + ", " + String.format("%.3f", uv1[1]) + "]");
             System.out.println("UV2: [" + String.format("%.3f", uv2[0]) + ", " + String.format("%.3f", uv2[1]) + "]");
             System.out.println("UV3: [" + String.format("%.3f", uv3[0]) + ", " + String.format("%.3f", uv3[1]) + "]");
-
-            List<Integer> texIndices = polygon.getTextureIndices();
-            System.out.println("UV-индексов в полигоне: " +
-                    (texIndices != null ? texIndices.size() : 0));
-            System.out.println("Всего UV-координат в модели: " + model.getTextureCoords().size());
         }
-
 
         for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
@@ -274,20 +329,7 @@ public class SoftwareRenderer {
 
                         double[] interpolatedNormal = null;
 
-                        if (model instanceof Model3D) {
-                            Model3D model3d = (Model3D) model;
-                            double[] normal = null;
-                            if (polygon.getNormal() != null) {
-                                Vector3D faceNormal = polygon.getNormal();
-                                normal = new double[]{
-                                        faceNormal.getX(),
-                                        faceNormal.getY(),
-                                        faceNormal.getZ()
-                                };
-                            }
-                        }
-
-                        if (interpolatedNormal == null && polygon.getNormal() != null) {
+                        if (polygon.getNormal() != null) {
                             Vector3D faceNormal = polygon.getNormal();
                             interpolatedNormal = new double[]{
                                     faceNormal.getX(),
@@ -297,17 +339,16 @@ public class SoftwareRenderer {
                         }
 
                         Color pixelColor;
-                        if (textureReady) {
+                        if (textureReady && useTexture) {
                             pixelColor = calculatePixelColor(model, u, v, interpolatedNormal);
                         } else {
-                            // Используем базовый цвет без текстуры
                             pixelColor = model.getBaseColor();
                             if (useLighting && interpolatedNormal != null) {
                                 pixelColor = applyLightingToColor(pixelColor, interpolatedNormal);
                             }
                         }
-                        gc.setFill(pixelColor);
-                        gc.fillRect(x, y, 1, 1);
+
+                        frameBuffer[x][y] = pixelColor;
                     }
                 }
             }
@@ -340,8 +381,6 @@ public class SoftwareRenderer {
         return baseColor;
     }
 
-
-
     /**
      * Применение освещения к цвету
      */
@@ -370,24 +409,14 @@ public class SoftwareRenderer {
     }
 
     /**
-     * Рендеринг каркаса (только ребра) с учетом Z-буфера
+     * Рендеринг каркаса (только ребра)
      */
     private void renderWireframe(List<Model3D> models) {
-        gc.setStroke(Color.RED);
-        gc.setLineWidth(1);
-
-        double cameraX = 0;
-        double cameraY = 0;
-        double cameraZ = 5;
-        double fov = 60;
-        double aspectRatio = (double) width / height;
-
-        Map<Vector3D, double[]> vertexProjections = new HashMap<>();
+        Matrix4x4 viewMatrix = camera.getViewMatrix();
+        Matrix4x4 projectionMatrix = camera.getProjectionMatrix();
 
         for (Model3D model : models) {
             if (!model.isVisible()) continue;
-
-            vertexProjections.clear();
 
             double tx = model.translateXProperty().get();
             double ty = model.translateYProperty().get();
@@ -401,56 +430,27 @@ public class SoftwareRenderer {
 
             for (Polygon polygon : model.getPolygons()) {
                 List<Integer> indices = polygon.getVertexIndices();
-                if (indices.size() != 3) continue;
+                if (indices.size() < 2) continue;
 
-                Vector3D v1 = model.getVertices().get(indices.get(0));
-                Vector3D v2 = model.getVertices().get(indices.get(1));
-                Vector3D v3 = model.getVertices().get(indices.get(2));
+                for (int i = 0; i < indices.size(); i++) {
+                    int nextIndex = (i + 1) % indices.size();
 
-                double[] p1 = getVertexProjection(v1, vertexProjections,
-                        tx, ty, tz, rx, ry, rz, sx, sy, sz,
-                        cameraX, cameraY, cameraZ, fov, aspectRatio);
-                double[] p2 = getVertexProjection(v2, vertexProjections,
-                        tx, ty, tz, rx, ry, rz, sx, sy, sz,
-                        cameraX, cameraY, cameraZ, fov, aspectRatio);
-                double[] p3 = getVertexProjection(v3, vertexProjections,
-                        tx, ty, tz, rx, ry, rz, sx, sy, sz,
-                        cameraX, cameraY, cameraZ, fov, aspectRatio);
+                    Vector3D v1 = model.getVertices().get(indices.get(i));
+                    Vector3D v2 = model.getVertices().get(indices.get(nextIndex));
 
-                drawLineWithZBuffer(p1, p2, Color.RED);
-                drawLineWithZBuffer(p2, p3, Color.RED);
-                drawLineWithZBuffer(p3, p1, Color.RED);
+                    double[] world1 = transformVertex(v1, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                    double[] world2 = transformVertex(v2, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+
+                    double[] screen1 = projectWithCamera(world1, viewMatrix, projectionMatrix);
+                    double[] screen2 = projectWithCamera(world2, viewMatrix, projectionMatrix);
+
+                    drawLine(screen1, screen2, wireframeColor);
+                }
             }
         }
     }
 
-    /**
-     * Получает проекцию вершины из кэша или вычисляет новую
-     */
-    private double[] getVertexProjection(Vector3D vertex,
-                                         Map<Vector3D, double[]> cache,
-                                         double tx, double ty, double tz,
-                                         double rx, double ry, double rz,
-                                         double sx, double sy, double sz,
-                                         double camX, double camY, double camZ,
-                                         double fov, double aspectRatio) {
-
-        if (cache.containsKey(vertex)) {
-            return cache.get(vertex);
-        }
-
-        double[] transformed = transformVertex(vertex, tx, ty, tz, rx, ry, rz, sx, sy, sz);
-        double[] projected = projectToScreen(transformed, camX, camY, camZ, fov, aspectRatio);
-
-        cache.put(vertex, projected);
-
-        return projected;
-    }
-
-    /**
-     * Рисует линию с учетом Z-буфера
-     */
-    private void drawLineWithZBuffer(double[] p1, double[] p2, Color color) {
+    private void drawLine(double[] p1, double[] p2, Color color) {
         double x1 = p1[0], y1 = p1[1], z1 = p1[2];
         double x2 = p2[0], y2 = p2[1], z2 = p2[2];
 
@@ -459,49 +459,29 @@ public class SoftwareRenderer {
         int x2i = (int) Math.round(x2);
         int y2i = (int) Math.round(y2);
 
-        if ((x1i < 0 && x2i < 0) || (x1i >= width && x2i >= width) ||
-                (y1i < 0 && y2i < 0) || (y1i >= height && y2i >= height)) {
-            return;
-        }
-
         int dx = Math.abs(x2i - x1i);
         int dy = Math.abs(y2i - y1i);
         int sx = x1i < x2i ? 1 : -1;
         int sy = y1i < y2i ? 1 : -1;
         int err = dx - dy;
 
-        double dz = z2 - z1;
-        double steps = Math.max(dx, dy);
-        double zStep = steps > 0 ? dz / steps : 0;
-        double currentZ = z1;
-
-        int x = x1i;
-        int y = y1i;
-
         while (true) {
-            if (x >= 0 && x < width && y >= 0 && y < height) {
-                if (currentZ < zBuffer[x][y] + 0.001) {
-                    gc.setFill(color);
-                    gc.fillRect(x, y, 1, 1);
+            if (x1i >= 0 && x1i < width && y1i >= 0 && y1i < height) {
+                if (z1 < zBuffer[x1i][y1i] + 0.001) {
+                    frameBuffer[x1i][y1i] = color;
                 }
             }
 
-            if (x == x2i && y == y2i) break;
+            if (x1i == x2i && y1i == y2i) break;
 
             int e2 = 2 * err;
             if (e2 > -dy) {
                 err -= dy;
-                x += sx;
-                if (dx > 0) {
-                    currentZ += (zStep * Math.abs(sx)) / dx;
-                }
+                x1i += sx;
             }
             if (e2 < dx) {
                 err += dx;
-                y += sy;
-                if (dy > 0) {
-                    currentZ += (zStep * Math.abs(sy)) / dy;
-                }
+                y1i += sy;
             }
         }
     }
@@ -516,6 +496,7 @@ public class SoftwareRenderer {
         }
         return v;
     }
+
     public void setCurrentTexture(Image texture) {
         this.currentTexture = texture;
     }
@@ -544,6 +525,10 @@ public class SoftwareRenderer {
         return renderWireframe;
     }
 
+    public boolean isShowVertices() {
+        return showVertices;
+    }
+
     public boolean isUseTexture() {
         return useTexture;
     }
@@ -554,55 +539,6 @@ public class SoftwareRenderer {
 
     public double[] getLightDirection() {
         return lightDirection;
-    }
-
-
-
-    /**
-     * Отрисовка нормалей для отладки
-     */
-    private void renderNormalsForDebug(Model3D model,
-                                       double tx, double ty, double tz,
-                                       double rx, double ry, double rz,
-                                       double sx, double sy, double sz) {
-
-        gc.setStroke(Color.GREEN);
-        gc.setLineWidth(1);
-
-        for (Polygon polygon : model.getPolygons()) {
-            List<Integer> indices = polygon.getVertexIndices();
-            if (indices.size() != 3) continue;
-
-            Vector3D v1 = model.getVertices().get(indices.get(0));
-            Vector3D v2 = model.getVertices().get(indices.get(1));
-            Vector3D v3 = model.getVertices().get(indices.get(2));
-
-            double centerX = (v1.getX() + v2.getX() + v3.getX()) / 3;
-            double centerY = (v1.getY() + v2.getY() + v3.getY()) / 3;
-            double centerZ = (v1.getZ() + v2.getZ() + v3.getZ()) / 3;
-
-            double[] transformedCenter = transformVertex(
-                    new Vector3D((float) centerX, (float) centerY, (float) centerZ),
-                    tx, ty, tz, rx, ry, rz, sx, sy, sz
-            );
-
-            Vector3D normal = polygon.getNormal();
-            if (normal != null) {
-                double endX = centerX + normal.getX() * 0.5;
-                double endY = centerY + normal.getY() * 0.5;
-                double endZ = centerZ + normal.getZ() * 0.5;
-
-                double[] transformedEnd = transformVertex(
-                        new Vector3D((float) endX, (float) endY, (float) endZ),
-                        tx, ty, tz, rx, ry, rz, sx, sy, sz
-                );
-
-                double[] screenStart = projectToScreen(transformedCenter, 0, 0, 5, 60, (double)width/height);
-                double[] screenEnd = projectToScreen(transformedEnd, 0, 0, 5, 60, (double)width/height);
-
-                gc.strokeLine(screenStart[0], screenStart[1], screenEnd[0], screenEnd[1]);
-            }
-        }
     }
 
     /**

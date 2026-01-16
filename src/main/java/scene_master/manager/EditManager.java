@@ -13,6 +13,8 @@ public class EditManager {
     private int selectedPolygonIndex = -1;
     private EditModeListener editModeListener;
 
+    private Model3D currentModel = null;
+
     public interface EditModeListener {
         void onEditModeChanged(boolean enabled);
     }
@@ -31,21 +33,30 @@ public class EditManager {
         }
     }
 
+    public void setCurrentModel(Model3D model) {
+        this.currentModel = model;
+        clearSelection();
+    }
+
     public boolean isEditMode() {
         return editMode;
     }
 
     public void selectVertex(int index) {
-        if (editMode) {
+        if (editMode && currentModel != null) {
             selectedVertexIndex = index;
             selectedPolygonIndex = -1;
+            System.out.println("Выбрана вершина #" + index +
+                    " в модели " + currentModel.getName());
         }
     }
 
     public void selectPolygon(int index) {
-        if (editMode) {
+        if (editMode && currentModel != null) {
             selectedPolygonIndex = index;
             selectedVertexIndex = -1;
+            System.out.println("Выбран полигон #" + index +
+                    " в модели " + currentModel.getName());
         }
     }
 
@@ -54,18 +65,17 @@ public class EditManager {
             ObservableList<Vector3D> vertices = model.getVertices();
             ObservableList<Polygon> polygons = model.getPolygons();
 
-            vertices.remove(selectedVertexIndex);// удаляем вершину
+            vertices.remove(selectedVertexIndex);
 
-            // обновляем все полигоны: удаляем те, что содержали эту вершину,
-            // и корректируем индексы в остальных
             for (int i = polygons.size() - 1; i >= 0; i--) {
                 Polygon polygon = polygons.get(i);
+                List<Integer> indices = polygon.getVertexIndices();
 
-                if (polygon.getVertexIndices().contains(selectedVertexIndex)) { // если полигон содержит эту вершину - удаляем весь полигон
+                if (indices.contains(selectedVertexIndex)) {
                     polygons.remove(i);
                 } else {
-                    List<Integer> newIndices = new ArrayList<>();// корректируем индексы > selectedVertexIndex
-                    for (Integer idx : polygon.getVertexIndices()) {
+                    List<Integer> newIndices = new ArrayList<>();
+                    for (Integer idx : indices) {
                         if (idx > selectedVertexIndex) {
                             newIndices.add(idx - 1);
                         } else {
@@ -87,6 +97,40 @@ public class EditManager {
         }
     }
 
+    public void deleteVertex(Model3D model, int vertexIndex) {
+        if (vertexIndex >= 0 && vertexIndex < model.getVertices().size()) {
+            ObservableList<Vector3D> vertices = model.getVertices();
+            ObservableList<Polygon> polygons = model.getPolygons();
+
+            vertices.remove(vertexIndex);
+
+            for (int i = polygons.size() - 1; i >= 0; i--) {
+                Polygon polygon = polygons.get(i);
+                List<Integer> indices = polygon.getVertexIndices();
+
+                if (indices.contains(vertexIndex)) {
+                    polygons.remove(i);
+                } else {
+                    List<Integer> newIndices = new ArrayList<>();
+                    for (Integer idx : indices) {
+                        if (idx > vertexIndex) {
+                            newIndices.add(idx - 1);
+                        } else {
+                            newIndices.add(idx);
+                        }
+                    }
+                    polygons.set(i, new Polygon(newIndices));
+                }
+            }
+        }
+    }
+
+    public void deletePolygon(Model3D model, int polygonIndex) {
+        if (polygonIndex >= 0 && polygonIndex < model.getPolygons().size()) {
+            model.getPolygons().remove(polygonIndex);
+        }
+    }
+
     public void clearSelection() {
         selectedVertexIndex = -1;
         selectedPolygonIndex = -1;
@@ -98,5 +142,9 @@ public class EditManager {
 
     public int getSelectedPolygonIndex() {
         return selectedPolygonIndex;
+    }
+
+    public Model3D getCurrentModel() {
+        return currentModel;
     }
 }

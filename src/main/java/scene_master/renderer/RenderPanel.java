@@ -7,6 +7,8 @@ import javafx.scene.paint.Color;
 import math.Camera;
 import math.LinealAlgebra.Vector3D;
 import scene_master.model.Model3D;
+import scene_master.model.Polygon;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +19,14 @@ public class RenderPanel extends Pane {
     private Camera camera;
 
     private boolean renderWireframe = false;
+    private boolean showVertices = false;
     private boolean useTexture = false;
     private boolean useLighting = false;
+    private boolean editModeEnabled = false;
+
+    private double vertexSize = 5.0;
+    private Color vertexColor = Color.YELLOW;
+    private Color selectedVertexColor = Color.RED;
 
     public RenderPanel(double width, double height) {
         canvas = new Canvas(width, height);
@@ -47,6 +55,10 @@ public class RenderPanel extends Pane {
         setOnMousePressed(event -> {
             lastMousePos[0] = event.getX();
             lastMousePos[1] = event.getY();
+
+            if (editModeEnabled) {
+                handleVertexSelection(event.getX(), event.getY());
+            }
         });
 
         setOnMouseDragged(event -> {
@@ -61,6 +73,60 @@ public class RenderPanel extends Pane {
             renderer.handleKeyPress(event.getCode());
             render();
         });
+    }
+
+    private void handleVertexSelection(double mouseX, double mouseY) {
+        double minDistance = Double.MAX_VALUE;
+        int closestVertexIndex = -1;
+        Model3D closestModel = null;
+
+        for (Model3D model : models) {
+            if (!model.isVisible()) continue;
+
+            double tx = model.translateXProperty().get();
+            double ty = model.translateYProperty().get();
+            double tz = model.translateZProperty().get();
+            double rx = Math.toRadians(model.rotateXProperty().get());
+            double ry = Math.toRadians(model.rotateYProperty().get());
+            double rz = Math.toRadians(model.rotateZProperty().get());
+            double sx = model.scaleXProperty().get();
+            double sy = model.scaleYProperty().get();
+            double sz = model.scaleZProperty().get();
+
+            for (int i = 0; i < model.getVertices().size(); i++) {
+                Vector3D vertex = model.getVertices().get(i);
+                double[] transformed = renderer.transformVertex(vertex,
+                        tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                double[] screen = projectVertex(transformed);
+
+                double distance = Math.sqrt(
+                        Math.pow(screen[0] - mouseX, 2) +
+                                Math.pow(screen[1] - mouseY, 2)
+                );
+
+                if (distance < minDistance && distance < 20) { // 20 пикселей - радиус выбора
+                    minDistance = distance;
+                    closestVertexIndex = i;
+                    closestModel = model;
+                }
+            }
+        }
+
+        if (closestVertexIndex != -1 && closestModel != null) {
+            System.out.println("Выбрана вершина #" + closestVertexIndex +
+                    " в модели " + closestModel.getName());
+        }
+    }
+
+    private double[] projectVertex(double[] vertex) {
+        double scale = 200;
+        double centerX = canvas.getWidth() / 2;
+        double centerY = canvas.getHeight() / 2;
+
+        double screenX = centerX + vertex[0] * scale;
+        double screenY = centerY - vertex[1] * scale; // Инвертируем Y
+
+        return new double[]{screenX, screenY};
     }
 
     public void addModel(Model3D model) {
@@ -83,10 +149,107 @@ public class RenderPanel extends Pane {
         renderer.setUseTexture(useTexture);
         renderer.setUseLighting(useLighting);
         renderer.renderScene(models);
+
+        if (showVertices) {
+            renderVertices();
+        }
+    }
+
+    private void renderVertices() {
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+
+        for (Model3D model : models) {
+            if (!model.isVisible()) continue;
+
+            double tx = model.translateXProperty().get();
+            double ty = model.translateYProperty().get();
+            double tz = model.translateZProperty().get();
+            double rx = Math.toRadians(model.rotateXProperty().get());
+            double ry = Math.toRadians(model.rotateYProperty().get());
+            double rz = Math.toRadians(model.rotateZProperty().get());
+            double sx = model.scaleXProperty().get();
+            double sy = model.scaleYProperty().get();
+            double sz = model.scaleZProperty().get();
+
+            for (int i = 0; i < model.getVertices().size(); i++) {
+                Vector3D vertex = model.getVertices().get(i);
+                double[] transformed = renderer.transformVertex(vertex,
+                        tx, ty, tz, rx, ry, rz, sx, sy, sz);
+
+                double[] screen = projectVertex(transformed);
+
+                Color currentVertexColor = editModeEnabled ? selectedVertexColor : vertexColor;
+
+                gc.setFill(currentVertexColor);
+                gc.fillOval(screen[0] - vertexSize/2, screen[1] - vertexSize/2,
+                        vertexSize, vertexSize);
+
+                // Обводка
+                gc.setStroke(Color.BLACK);
+                gc.setLineWidth(1);
+                gc.strokeOval(screen[0] - vertexSize/2, screen[1] - vertexSize/2,
+                        vertexSize, vertexSize);
+
+                if (editModeEnabled && vertexSize > 6) {
+                    gc.setFill(Color.WHITE);
+                    gc.setFont(javafx.scene.text.Font.font(10));
+                    gc.fillText(String.valueOf(i),
+                            screen[0] - 4, screen[1] + 4);
+                }
+            }
+
+            if (editModeEnabled) {
+                renderPolygonCenters(model, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+            }
+        }
+    }
+
+    private void renderPolygonCenters(Model3D model,
+                                      double tx, double ty, double tz,
+                                      double rx, double ry, double rz,
+                                      double sx, double sy, double sz) {
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+
+        for (int i = 0; i < model.getPolygons().size(); i++) {
+            Polygon polygon = model.getPolygons().get(i);
+            List<Integer> indices = polygon.getVertexIndices();
+
+            if (indices.isEmpty()) continue;
+
+            double centerX = 0, centerY = 0, centerZ = 0;
+            for (int idx : indices) {
+                Vector3D vertex = model.getVertices().get(idx);
+                centerX += vertex.getX();
+                centerY += vertex.getY();
+                centerZ += vertex.getZ();
+            }
+
+            centerX /= indices.size();
+            centerY /= indices.size();
+            centerZ /= indices.size();
+
+            Vector3D center = new Vector3D((float)centerX, (float)centerY, (float)centerZ);
+            double[] transformed = renderer.transformVertex(center,
+                    tx, ty, tz, rx, ry, rz, sx, sy, sz);
+
+            double[] screen = projectVertex(transformed);
+
+            gc.setFill(Color.LIMEGREEN);
+            gc.fillRect(screen[0] - 4, screen[1] - 4, 8, 8);
+
+            gc.setFill(Color.WHITE);
+            gc.setFont(javafx.scene.text.Font.font(10));
+            gc.fillText("P" + i, screen[0] + 6, screen[1] + 4);
+        }
     }
 
     public void setRenderWireframe(boolean renderWireframe) {
         this.renderWireframe = renderWireframe;
+        render();
+    }
+
+    public void setShowVertices(boolean showVertices) {
+        this.showVertices = showVertices;
         render();
     }
 
@@ -95,10 +258,33 @@ public class RenderPanel extends Pane {
         render();
     }
 
-
     public void setUseLighting(boolean useLighting) {
         this.useLighting = useLighting;
         render();
+    }
+
+    public void setEditModeEnabled(boolean enabled) {
+        this.editModeEnabled = enabled;
+        if (enabled) {
+            setVertexSize(8.0);
+            setSelectedVertexColor(Color.RED);
+        } else {
+            setVertexSize(5.0);
+            setVertexColor(Color.YELLOW);
+        }
+        render();
+    }
+
+    public void setVertexSize(double size) {
+        this.vertexSize = Math.max(1.0, Math.min(20.0, size));
+    }
+
+    public void setVertexColor(Color color) {
+        this.vertexColor = color;
+    }
+
+    public void setSelectedVertexColor(Color color) {
+        this.selectedVertexColor = color;
     }
 
     public void setAmbientLight(double ambient) {
@@ -121,7 +307,6 @@ public class RenderPanel extends Pane {
         render();
     }
 
-
     public Canvas getCanvas() {
         return canvas;
     }
@@ -138,12 +323,20 @@ public class RenderPanel extends Pane {
         return renderWireframe;
     }
 
+    public boolean isShowVertices() {
+        return showVertices;
+    }
+
     public boolean isUseTexture() {
         return useTexture;
     }
 
     public boolean isUseLighting() {
         return useLighting;
+    }
+
+    public boolean isEditModeEnabled() {
+        return editModeEnabled;
     }
 
     public SoftwareRenderer getRenderer() {
