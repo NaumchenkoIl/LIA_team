@@ -4,6 +4,8 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import math.Camera;
+import math.LinealAlgebra.Vector3D;
 import scene_master.model.Model3D;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +14,7 @@ public class RenderPanel extends Pane {
     private Canvas canvas;
     private SoftwareRenderer renderer;
     private List<Model3D> models = new ArrayList<>();
+    private Camera camera;
 
     private boolean renderWireframe = false;
     private boolean useTexture = false;
@@ -24,26 +27,40 @@ public class RenderPanel extends Pane {
         canvas.widthProperty().bind(this.widthProperty());
         canvas.heightProperty().bind(this.heightProperty());
 
-        renderer = new SoftwareRenderer(canvas);
+        camera = new Camera(new Vector3D(0, 0, 5), new Vector3D(0, 0, 0));
+        renderer = new SoftwareRenderer(canvas, camera);
 
-        renderer.setAmbientLight(0.5);
-        renderer.setDiffuseIntensity(0.8);
-        renderer.setLightDirection(0, -0.5, -1);
+        setupMouseHandlers();
 
-        this.widthProperty().addListener((obs, oldVal, newVal) -> {
-            renderer.resize(newVal.intValue(), (int) canvas.getHeight());
-            render();
-        });
-
-        this.heightProperty().addListener((obs, oldVal, newVal) -> {
-            renderer.resize((int) canvas.getWidth(), newVal.intValue());
-            render();
-        });
+        setFocusTraversable(true);
+        canvas.setOnMouseClicked(e -> requestFocus());
     }
 
     public void setModels(List<Model3D> models) {
         this.models = models;
         render();
+    }
+
+    private void setupMouseHandlers() {
+        double[] lastMousePos = {0, 0};
+
+        setOnMousePressed(event -> {
+            lastMousePos[0] = event.getX();
+            lastMousePos[1] = event.getY();
+        });
+
+        setOnMouseDragged(event -> {
+            renderer.handleMouseDragged(event.getX(), event.getY(), lastMousePos[0], lastMousePos[1]);
+            lastMousePos[0] = event.getX();
+            lastMousePos[1] = event.getY();
+            render();
+        });
+
+        setFocusTraversable(true);
+        setOnKeyPressed(event -> {
+            renderer.handleKeyPress(event.getCode());
+            render();
+        });
     }
 
     public void addModel(Model3D model) {
@@ -103,6 +120,7 @@ public class RenderPanel extends Pane {
         renderer.setBackgroundColor(color);
         render();
     }
+
 
     public Canvas getCanvas() {
         return canvas;

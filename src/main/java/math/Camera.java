@@ -41,4 +41,5 @@ public class Camera {
     public Matrix4x4 getProjectionMatrix() {
         return Matrix4x4.perspective(fov, aspect, near, far);
     }
+
 }

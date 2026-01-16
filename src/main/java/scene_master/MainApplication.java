@@ -53,8 +53,6 @@ public class MainApplication extends Application {
     private BorderPane modelPropertiesPanel; // панель свойств модели
     private EditManager editManager = new EditManager();
     private String currentTheme = "dark";
-  //  private Image currentTexture = null; // текущая загруженная текстура
-  //  private String textureFileName = ""; // имя файла текстуры
     private RenderPanel renderPanel;
 
     @Override

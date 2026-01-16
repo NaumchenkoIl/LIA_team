@@ -96,4 +96,12 @@ public class CameraInputAdapter {
 
         camera.setPosition(newPos);
     }
+
+    public double getYaw() {
+        return yaw;
+    }
+
+    public double getPitch() {
+        return pitch;
+    }
 }

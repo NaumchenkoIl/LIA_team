@@ -1,6 +1,11 @@
 package scene_master.renderer;
 
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
+import math.Camera;
+import math.CameraInputAdapter;
+import math.LinealAlgebra.Vector4D;
+import math.Matrix.Matrix4x4;
 import math.ModelTransform;
 import scene_master.model.Model3D;
 import scene_master.model.Polygon;
@@ -37,11 +42,15 @@ public class SoftwareRenderer {
     private long lastRenderTime = 0;
     private static final long MIN_RENDER_INTERVAL = 16;
 
-    public SoftwareRenderer(Canvas canvas) {
+    private Camera camera;
+    private CameraInputAdapter cameraInputAdapter;
+
+    public SoftwareRenderer(Canvas canvas, Camera camera) {
         this.canvas = canvas;
-        this.gc = canvas.getGraphicsContext2D();
-        this.width = (int) canvas.getWidth();
-        this.height = (int) canvas.getHeight();
+        this.camera = camera;
+        this.cameraInputAdapter = new CameraInputAdapter(camera);
+        this.width = 800;
+        this.height = 600;
         initZBuffer();
     }
 
@@ -84,8 +93,10 @@ public class SoftwareRenderer {
      * Очистка экрана и Z-буфера
      */
     public void clear() {
-        gc.setFill(backgroundColor);
-        gc.fillRect(0, 0, width, height);
+        if (gc != null) {
+            gc.setFill(backgroundColor);
+            gc.fillRect(0, 0, width, height);
+        }
         clearZBuffer();
     }
 
@@ -93,20 +104,30 @@ public class SoftwareRenderer {
      * Рендеринг сцены со всеми моделями
      */
     public void renderScene(List<Model3D> models) {
+        int currentWidth = (int) canvas.getWidth();
+        int currentHeight = (int) canvas.getHeight();
+
+        if (currentWidth != width || currentHeight != height) {
+            this.width = currentWidth;
+            this.height = currentHeight;
+            initZBuffer();
+        }
+
+        this.gc = canvas.getGraphicsContext2D();
+        if (gc == null) return;
+
         long currentTime = System.currentTimeMillis();
         if (currentTime - lastRenderTime < MIN_RENDER_INTERVAL) {
             return;
         }
         lastRenderTime = currentTime;
 
+        camera.setAspectRatio((float) width / height);
         clear();
         debugTriangleCount = 0;
 
-        double cameraX = 0;
-        double cameraY = 0;
-        double cameraZ = 5;
-        double fov = 60;
-        double aspectRatio = (double) width / height;
+        Matrix4x4 viewMatrix = camera.getViewMatrix();
+        Matrix4x4 projectionMatrix = camera.getProjectionMatrix();
 
         for (Model3D model : models) {
             if (!model.isVisible()) continue;
@@ -136,13 +157,13 @@ public class SoftwareRenderer {
                 Vector3D v2 = model.getVertices().get(indices.get(1));
                 Vector3D v3 = model.getVertices().get(indices.get(2));
 
-                double[] p1 = transformVertex(v1, tx, ty, tz, rx, ry, rz, sx, sy, sz);
-                double[] p2 = transformVertex(v2, tx, ty, tz, rx, ry, rz, sx, sy, sz);
-                double[] p3 = transformVertex(v3, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                double[] world1 = transformVertex(v1, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                double[] world2 = transformVertex(v2, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                double[] world3 = transformVertex(v3, tx, ty, tz, rx, ry, rz, sx, sy, sz);
 
-                double[] screen1 = projectToScreen(p1, cameraX, cameraY, cameraZ, fov, aspectRatio);
-                double[] screen2 = projectToScreen(p2, cameraX, cameraY, cameraZ, fov, aspectRatio);
-                double[] screen3 = projectToScreen(p3, cameraX, cameraY, cameraZ, fov, aspectRatio);
+                double[] screen1 = projectWithCamera(world1, viewMatrix, projectionMatrix);
+                double[] screen2 = projectWithCamera(world2, viewMatrix, projectionMatrix);
+                double[] screen3 = projectWithCamera(world3, viewMatrix, projectionMatrix);
 
                 renderTriangle(screen1, screen2, screen3, model, polygon, textureReady);
             }
@@ -582,5 +603,43 @@ public class SoftwareRenderer {
                 gc.strokeLine(screenStart[0], screenStart[1], screenEnd[0], screenEnd[1]);
             }
         }
+    }
+
+    /**
+     * Обработка событий мыши
+     */
+    public void handleMouseDragged(double x, double y, double lastX, double lastY) {
+        float deltaX = (float)(x - lastX);
+        float deltaY = (float)(y - lastY);
+        cameraInputAdapter.onMouseDragged(deltaX, deltaY);
+    }
+
+    public void handleKeyPress(KeyCode key) {
+        cameraInputAdapter.onKeyPressed(key);
+    }
+
+    private double[] projectWithCamera(double[] worldPos, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix) {
+        Vector4D world = new Vector4D(
+                (float)worldPos[0],
+                (float)worldPos[1],
+                (float)worldPos[2],
+                1.0f
+        );
+
+        Vector4D view = viewMatrix.multiply(world);
+        Vector4D clip = projectionMatrix.multiply(view);
+
+        if (Math.abs(clip.getW()) < 1e-6) {
+            return new double[]{0, 0, 0};
+        }
+
+        double ndcX = clip.getX() / clip.getW();
+        double ndcY = clip.getY() / clip.getW();
+        double ndcZ = clip.getZ() / clip.getW();
+
+        double screenX = (ndcX + 1) * 0.5 * width;
+        double screenY = (1 - ndcY) * 0.5 * height;
+
+        return new double[]{screenX, screenY, ndcZ};
     }
 }
