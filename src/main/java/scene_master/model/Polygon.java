@@ -1,19 +1,19 @@
 package scene_master.model;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
+import math.LinealAlgebra.Vector3D;
 
 public class Polygon {
     private final List<Integer> vertexIndices;
-    private final List<Integer> textureIndices; // Индексы текстурных координат
-    private final List<Integer> normalIndices; // Индексы текстурных координат
+    private List<Integer> textureIndices;
+    private List<Integer> normalIndices;
     private Vector3D normal;
 
-    public Polygon(List<Integer> vertexIndices, List<Integer> textureIndices, List<Integer> normalIndices) {
+    public Polygon(List<Integer> vertexIndices) {
         this.vertexIndices = List.copyOf(vertexIndices);
-        this.textureIndices = textureIndices != null ? new ArrayList<>(textureIndices) : new ArrayList<>();
-        this.normalIndices = normalIndices != null ? new ArrayList<>(normalIndices) : new ArrayList<>();
+        this.textureIndices = new ArrayList<>();
+        this.normalIndices = new ArrayList<>();
     }
 
     public Polygon(int... indices) {
@@ -23,15 +23,30 @@ public class Polygon {
         }
         this.textureIndices = new ArrayList<>();
         this.normalIndices = new ArrayList<>();
-
     }
 
     public void setNormal(Vector3D normal) {
         this.normal = normal;
     }
 
+    public void setTextureIndices(List<Integer> textureIndices) {
+        this.textureIndices = new ArrayList<>(textureIndices);
+    }
+
+    public void setNormalIndices(List<Integer> normalIndices) {
+        this.normalIndices = new ArrayList<>(normalIndices);
+    }
+
     public Vector3D getNormal() {
         return this.normal;
+    }
+
+    public List<Integer> getTextureIndices() {
+        return this.textureIndices;
+    }
+
+    public List<Integer> getNormalIndices() {
+        return this.normalIndices;
     }
 
     public List<Integer> getVertexIndices() {
@@ -44,26 +59,11 @@ public class Polygon {
         }).toArray();
     }
 
-    public Polygon(List<Integer> vertexIndices, List<Integer> textureIndices) {
-        this.vertexIndices = List.copyOf(vertexIndices);
-        this.textureIndices = new ArrayList<>(textureIndices);
-        this.normalIndices = new ArrayList<>();
+    public boolean hasTexture() {
+        return !textureIndices.isEmpty();
     }
 
-    public Polygon(List<Integer> vertexIndices) {
-        this.vertexIndices = List.copyOf(vertexIndices);
-        this.textureIndices = new ArrayList<>();
-        this.normalIndices = new ArrayList<>(); // если у тебя есть normalIndices
+    public boolean hasNormals() {
+        return !normalIndices.isEmpty();
     }
-
-    // Геттер для текстурных индексов
-    public List<Integer> getTextureIndices() {
-        return textureIndices;
-    }
-
-    // Добавить текстурный индекс
-    public void addTextureIndex(int index) {
-        textureIndices.add(index);
-    }
-    public List<Integer> getNormalIndices() { return normalIndices; }
 }

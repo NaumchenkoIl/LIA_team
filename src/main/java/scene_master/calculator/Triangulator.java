@@ -1,8 +1,8 @@
 package scene_master.calculator;
 
+import math.LinealAlgebra.Vector3D;
 import scene_master.model.Model;
 import scene_master.model.Polygon;
-import scene_master.model.Vector3D;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -187,7 +187,7 @@ public class Triangulator {
     private boolean isConvex(Vector3D a, Vector3D b, Vector3D c) {
         Vector3D ab = subtract(b, a);
         Vector3D bc = subtract(c, b);
-        Vector3D cross = ab.crossProduct(bc);
+        Vector3D cross = ab.cross(bc);
 
         // Для 2D проверки используем только Z-компоненту
         // В 3D нужно спроецировать на плоскость полигона, но для простоты используем Z
@@ -213,7 +213,7 @@ public class Triangulator {
 
             Vector3D ab = subtract(b, a);
             Vector3D bc = subtract(c, b);
-            Vector3D cross = ab.crossProduct(bc);
+            Vector3D cross = ab.cross(bc);
 
             double crossZ = cross.getZ();
 

@@ -15,7 +15,6 @@ public class TextureManager {
     private final Map<String, Image> textures = new HashMap<>();
     private final Map<String, int[][]> textureData = new HashMap<>();
 
-    // Текстура по умолчанию (шахматная доска)
     private Image defaultTexture;
 
     private TextureManager() {
@@ -97,12 +96,11 @@ public class TextureManager {
     public Color getTextureColor(Image texture, double u, double v) {
         if (texture == null) return Color.WHITE;
 
-        // Обрезаем координаты до [0, 1]
         u = u - Math.floor(u);
         v = v - Math.floor(v);
 
         int x = (int) (u * (texture.getWidth() - 1));
-        int y = (int) ((1 - v) * (texture.getHeight() - 1)); // Инвертируем V
+        int y = (int) ((1 - v) * (texture.getHeight() - 1));
 
         x = Math.max(0, Math.min(x, (int) texture.getWidth() - 1));
         y = Math.max(0, Math.min(y, (int) texture.getHeight() - 1));
