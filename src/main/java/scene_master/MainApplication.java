@@ -32,12 +32,10 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.paint.Color;
 import javafx.scene.image.Image;
-import javafx.scene.paint.Color;
+import javafx.scene.image.ImageView;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -55,12 +53,14 @@ public class MainApplication extends Application {
     private String currentTheme = "dark";
     private RenderPanel renderPanel;
     private Stage loadingStage;
+    private Image currentTexture = null; // текущая загруженная текстура
+    private String textureFileName = ""; // имя файла текстуры
 
     @Override
     public void start(Stage primaryStage) { // точка входа приложения
         this.primaryStage = primaryStage; // сохраняем ссылку на окно
         this.selectionManager = new SelectionManager(); // создаем менеджер выделения
-        this.sceneManager = new SceneManager(selectionManager); //создаем менеджер сцены
+        this.sceneManager = new SceneManager(selectionManager); //сздаем менеджер сцены
 
         BorderPane root = new BorderPane(); // главный контейнер (распределяет элементы по сторонам)
         root.getStyleClass().add("root");
@@ -127,19 +127,15 @@ public class MainApplication extends Application {
         MenuItem darkThemeItem = new MenuItem("Тёмная тема");
         MenuItem lightThemeItem = new MenuItem("Светлая тема");
 
-        useTextureItem.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            if (renderPanel != null) {
+        // Изначально отключаем некоторые пункты, если нет 3D-рендерера
+        if (renderPanel == null) {
+            useTextureItem.setDisable(true);
+            useLightingItem.setDisable(true);
+        } else {
+            useTextureItem.selectedProperty().addListener((obs, oldVal, newVal) -> {
                 renderPanel.setUseTexture(newVal);
-            }
-        });
-
-        selectionManager.getSelectedModels().addListener((ListChangeListener<Model3D>) c -> {
-            boolean hasTexture = selectionManager.getActiveModel() != null &&
-                    selectionManager.getActiveModel().getTexture() != null;
-            useTextureItem.setDisable(!hasTexture);
-        });
-
-        useLightingItem.setDisable(true); // пока недоступно
+            });
+        }
 
         darkThemeItem.setOnAction(e -> switchTheme("dark"));
         lightThemeItem.setOnAction(e -> switchTheme("light"));
@@ -185,6 +181,11 @@ public class MainApplication extends Application {
                     return;
                 }
 
+                // Сохраняем текстуру для общего доступа
+                currentTexture = texture;
+                textureFileName = file.getName();
+
+                // Применяем текстуру к модели
                 activeModel.setTexture(texture);
 
                 if (activeModel.getTextureCoords().isEmpty()) {
@@ -198,9 +199,11 @@ public class MainApplication extends Application {
 
                 updateModelPropertiesPanel(activeModel);
                 showLoadingIndicator(false);
+                updateStatusBarTextureInfo();
 
                 DialogHelper.showInfoDialog("Текстура загружена",
-                        "Текстура '" + file.getName() + "' применена к модели");
+                        "Текстура '" + file.getName() + "' применена к модели\n" +
+                                "Размер: " + (int)texture.getWidth() + "x" + (int)texture.getHeight());
             });
 
             textureTask.setOnFailed(event -> {
@@ -223,12 +226,13 @@ public class MainApplication extends Application {
         modelListView = new ListView<>(); // список моделей (виджет)
         modelListView.setItems(sceneManager.getModelWrappers());// привязываем данные из sceneManager
         modelListView.setCellFactory(lv -> new ModelListCell()); // настраиваем отображение элементов списка
-        modelListView.getSelectionModel().selectedItemProperty().addListener( //слушатель изменения выделения
+        modelListView.getSelectionModel().selectedItemProperty().addListener( //слушаткль изменения выделения
                 (obs, oldVal, newVal) -> {
                     selectionManager.clearSelection(); // очищаем предыдущее выделение
                     if (newVal != null) { // если выбран новый элемент (не null)
                         selectionManager.selectModel(newVal.getUIModel()); // выделяем модель в selectionManager
                         updateModelPropertiesPanel(newVal.getUIModel()); // обновляем панель свойств
+                        updateStatistics(); // обновляем статистику
                     }
                 });
 
@@ -263,21 +267,45 @@ public class MainApplication extends Application {
     }
 
     private Pane createCenterPanel() { // создает центральную панель для 3d-отображения
-        renderPanel = new RenderPanel(800, 600);
-        renderPanel.getStyleClass().add("view-3d");
-        renderPanel.setStyle("-fx-background-color: #1a1a2e;");
+        try {
+            // Пытаемся создать RenderPanel для 3D-отображения
+            renderPanel = new RenderPanel(800, 600);
+            renderPanel.getStyleClass().add("view-3d");
+            renderPanel.setStyle("-fx-background-color: #1a1a2e;");
 
-        sceneManager.getModelWrappers().addListener((ListChangeListener<ModelWrapper>) change -> {
-            List<Model3D> models = new ArrayList<>();
-            for (ModelWrapper wrapper : sceneManager.getModelWrappers()) {
-                if (wrapper.getUIModel() != null) {
-                    models.add(wrapper.getUIModel());
+            // Слушатель изменений списка моделей
+            sceneManager.getModelWrappers().addListener((ListChangeListener<ModelWrapper>) change -> {
+                List<Model3D> models = new ArrayList<>();
+                for (ModelWrapper wrapper : sceneManager.getModelWrappers()) {
+                    if (wrapper.getUIModel() != null) {
+                        models.add(wrapper.getUIModel());
+                    }
                 }
-            }
-            renderPanel.setModels(models);
-        });
+                renderPanel.setModels(models);
+            });
 
-        return renderPanel;
+            return renderPanel;
+        } catch (Exception e) {
+            // Если RenderPanel недоступен, создаем заглушку
+            System.err.println("RenderPanel не доступен: " + e.getMessage());
+            Pane view3d = new Pane();
+            view3d.getStyleClass().add("view-3d");
+            view3d.setStyle("-fx-background-color: #1a1a2e;");
+
+            Label placeholder = new Label("3D Вид (Режим предварительного просмотра)\n\n" +
+                    "Для полного функционала убедитесь, что все зависимости установлены");
+            placeholder.setStyle("-fx-text-fill: #cccccc; -fx-font-size: 14px; -fx-alignment: center;");
+            placeholder.setWrapText(true);
+            placeholder.setMaxWidth(Double.MAX_VALUE);
+            placeholder.setMaxHeight(Double.MAX_VALUE);
+
+            VBox container = new VBox(placeholder);
+            container.setAlignment(javafx.geometry.Pos.CENTER);
+            VBox.setVgrow(container, Priority.ALWAYS);
+
+            view3d.getChildren().add(container);
+            return view3d;
+        }
     }
 
     private VBox createRightPanel() { // создает правую панель свойств
@@ -290,7 +318,7 @@ public class MainApplication extends Application {
         propertiesLabel.getStyleClass().add("section-label");
 
         modelPropertiesPanel = new BorderPane(); // контейнер для свойств (пока пустой)
-        modelPropertiesPanel.setCenter(new Label("Select a model to edit properties")); // инструкция
+        modelPropertiesPanel.setCenter(new Label("Выберите модель для редактирования свойств")); // инструкция
 
         Label transformLabel = new Label("Трансформации");
         transformLabel.getStyleClass().add("section-label");
@@ -404,28 +432,31 @@ public class MainApplication extends Application {
         colorPicker.valueProperty().bindBidirectional(model.baseColorProperty());
         colorBox.getChildren().addAll(colorLabel, colorPicker);
 
+        HBox textureBox = new HBox(10);// информация о текстуре
+        Label textureLabel = new Label("Текстура:");
+        String textureStatus = model.getTexture() != null ?
+                "✓ Текстура загружена" :
+                currentTexture != null ? "✓ Текстура доступна (не применена)" : "Нет текстуры";
+        Label textureInfo = new Label(textureStatus);
+        textureInfo.setTextFill(model.getTexture() != null || currentTexture != null ? Color.GREEN : Color.GRAY);
+        Button loadTextureBtn = new Button("Загрузить...");
+        loadTextureBtn.setOnAction(e -> loadTexture());
+        textureBox.getChildren().addAll(textureLabel, textureInfo, loadTextureBtn);
+
         model.baseColorProperty().addListener((obs, oldVal, newVal) -> {
             if (renderPanel != null) {
                 renderPanel.render();
             }
         });
 
-        model.textureProperty().addListener((obs, oldVal, newVal) -> {
-            if (renderPanel != null) {
-                renderPanel.setUseTexture(newVal != null);
-                renderPanel.render();
-            }
-        });
-
-        HBox textureBox = new HBox(10);// информация о текстуре
-        Label textureLabel = new Label("Текстура:");
-        Label textureInfo = new Label(
-                model.getTexture() != null ? "✓ Текстура загружена" : "Нет текстуры"
-        );
-        textureInfo.setTextFill(model.getTexture() != null ? Color.GREEN : Color.GRAY);
-        Button loadTextureBtn = new Button("Загрузить...");
-        loadTextureBtn.setOnAction(e -> loadTexture());
-        textureBox.getChildren().addAll(textureLabel, textureInfo, loadTextureBtn);
+        if (model.textureProperty() != null) {
+            model.textureProperty().addListener((obs, oldVal, newVal) -> {
+                if (renderPanel != null) {
+                    renderPanel.setUseTexture(newVal != null);
+                    renderPanel.render();
+                }
+            });
+        }
 
         Label statsLabel = new Label(String.format(
                 "Статистика модели:\n" +
@@ -461,6 +492,10 @@ public class MainApplication extends Application {
                     ObjReader objReader = new ObjReader();
                     Model loadedModel = objReader.readModel(file.getAbsolutePath());
 
+                    // Триангулируем модель, если необходимо
+                    Triangulator triangulator = new Triangulator();
+                    triangulator.triangulateModel(loadedModel);
+
                     return new ModelWrapper(loadedModel,
                             file.getName().replace(".obj", ""));
                 }
@@ -470,6 +505,7 @@ public class MainApplication extends Application {
                 ModelWrapper wrapper = loadTask.getValue();
                 sceneManager.addModelWrapper(wrapper);
                 showLoadingIndicator(false);
+                updateStatistics();
 
                 DialogHelper.showInfoDialog("Успешно",
                         String.format("Модель загружена!\nВершин: %d\nПолигонов: %d",
@@ -513,7 +549,7 @@ public class MainApplication extends Application {
                 try {
                     boolean applyTransformations = DialogHelper.showSaveOptionsDialog();// спрашиваем пользователя, как сохранять
 
-                    if (applyTransformations) {
+                    if (applyTransformations && selectedWrapper.getOriginalModel() != null) {
                         applyTransformationsToOriginalModel(selectedWrapper);
                         selectedWrapper.updateUIModel(); // синхронизируем UI
                     }
@@ -549,7 +585,8 @@ public class MainApplication extends Application {
 
     private void addTestModel() { // добавление тестовой модели
         try {
-            String filePath = "C:/Users/Александр/Desktop/for3person/LIA_team/src/test/test_cube.obj";
+            // Попробуем загрузить тестовую модель из файла
+            String filePath = "test_cube.obj"; // Относительный путь
 
             ObjReader reader = new ObjReader();
             Model originalModel = reader.readModel(filePath);
@@ -557,10 +594,11 @@ public class MainApplication extends Application {
             Triangulator triangulator = new Triangulator();
             triangulator.triangulateModel(originalModel);
 
-            String name = "Cube from file " + (sceneManager.getModelWrappers().size() + 1);
+            String name = "Cube " + (sceneManager.getModelWrappers().size() + 1);
             ModelWrapper wrapper = new ModelWrapper(originalModel, name);
 
             sceneManager.addModelWrapper(wrapper);
+            updateStatistics();
 
             if (renderPanel != null) {
                 List<Model3D> models = sceneManager.getModelWrappers().stream()
@@ -571,7 +609,12 @@ public class MainApplication extends Application {
             }
 
         } catch (Exception e) {
-            ErrorHandler.handleException(e, "загрузка тестовой модели");
+            // Если не удалось загрузить из файла, создаем простую модель
+            System.err.println("Не удалось загрузить тестовую модель: " + e.getMessage());
+            Model3D testModel = new Model3D("Test Model " + (sceneManager.getModelWrappers().size() + 1));
+            ModelWrapper wrapper = new ModelWrapper(null, testModel.nameProperty().get());
+            sceneManager.addModelWrapper(wrapper);
+            updateStatistics();
         }
     }
 
@@ -579,6 +622,7 @@ public class MainApplication extends Application {
         ModelWrapper selected = modelListView.getSelectionModel().getSelectedItem(); // получаем выбранную модель
         if (selected != null) { // если что-то выбрано
             sceneManager.removeModelWrapper(selected); // удаляем из сцены
+            updateStatistics();
         }
     }
 
@@ -587,9 +631,9 @@ public class MainApplication extends Application {
         if (enabled) {
             DialogHelper.showInfoDialog("Режим редактирования",
                     "Режим редактирования включен.\n" +
-                            "1. Включите 3D-вид (когда будет готов)\n" +
-                            "2. Кликните на вершину/полигон для выбора\n" +
-                            "3. Удалите через меню или клавишу Delete");
+                            "1. Выберите модель в списке слева\n" +
+                            "2. Используйте инструменты редактирования\n" +
+                            "3. Удаляйте через меню или клавишу Delete");
         }
     }
 
@@ -599,6 +643,7 @@ public class MainApplication extends Application {
             if (editManager.getSelectedVertexIndex() != -1) {
                 editManager.deleteSelectedVertex(activeModel);
                 updateModelPropertiesPanel(activeModel);
+                updateStatistics();
                 DialogHelper.showInfoDialog("Успех", "Вершина удалена");
             } else {
                 DialogHelper.showWarningDialog("Внимание", "Выберите вершину для удаления");
@@ -612,7 +657,8 @@ public class MainApplication extends Application {
             if (editManager.getSelectedPolygonIndex() != -1) {
                 editManager.deleteSelectedPolygon(activeModel);
                 updateModelPropertiesPanel(activeModel);
-                DialogHelper.showInfoDialog("Успех", "Полигон удалена");
+                updateStatistics();
+                DialogHelper.showInfoDialog("Успех", "Полигон удален");
             } else {
                 DialogHelper.showWarningDialog("Внимание", "Выберите полигон для удаления");
             }
@@ -630,6 +676,7 @@ public class MainApplication extends Application {
             ModelWrapper selected = modelListView.getSelectionModel().getSelectedItem();// в обычном режиме удаляем модель
             if (selected != null) {
                 sceneManager.removeModelWrapper(selected);
+                updateStatistics();
             }
         }
     }
@@ -666,6 +713,20 @@ public class MainApplication extends Application {
         Model3D activeModel = selectionManager.getActiveModel();
         if (activeModel != null) {
             updateStatusBarStatistics(activeModel);
+        } else {
+            // Если нет активной модели, сбрасываем статистику
+            HBox statusBar = (HBox) primaryStage.getScene().lookup("#status-bar");
+            if (statusBar != null) {
+                Label vertexCountLabel = (Label) statusBar.lookup("#vertex-count");
+                Label polygonCountLabel = (Label) statusBar.lookup("#polygon-count");
+                Label textureCountLabel = (Label) statusBar.lookup("#texture-count");
+                Label normalCountLabel = (Label) statusBar.lookup("#normal-count");
+
+                if (vertexCountLabel != null) vertexCountLabel.setText("Вершин: 0");
+                if (polygonCountLabel != null) polygonCountLabel.setText("Полигонов: 0");
+                if (textureCountLabel != null) textureCountLabel.setText("Текстур: 0");
+                if (normalCountLabel != null) normalCountLabel.setText("Нормалей: 0");
+            }
         }
     }
 
@@ -692,9 +753,28 @@ public class MainApplication extends Application {
         }
     }
 
+    private void updateStatusBarTextureInfo() { // обновляет информацию о текстуре в статус баре
+        HBox statusBar = (HBox) primaryStage.getScene().lookup("#status-bar");
+        if (statusBar == null) return;
+
+        Label textureInfoLabel = (Label) statusBar.lookup("#texture-info");
+        if (textureInfoLabel != null) {
+            if (currentTexture != null) {
+                textureInfoLabel.setText("Текстура: " + textureFileName +
+                        " (" + (int)currentTexture.getWidth() + "x" + (int)currentTexture.getHeight() + ")");
+                textureInfoLabel.setTextFill(Color.GREEN);
+            } else {
+                textureInfoLabel.setText("Текстура: не загружена");
+                textureInfoLabel.setTextFill(Color.GRAY);
+            }
+        }
+    }
+
     private void applyTransformationsToOriginalModel(ModelWrapper wrapper) {
         Model3D uiModel = wrapper.getUIModel();
         Model originalModel = wrapper.getOriginalModel();
+
+        if (originalModel == null) return;
 
         ModelTransform transform = new ModelTransform();
         transform.setTranslation(
@@ -733,6 +813,7 @@ public class MainApplication extends Application {
             );
         }
 
+        // Пересчитываем нормали
         NormalCalculator calc = new NormalCalculator();
         calc.calculateNormals(originalModel);
     }
