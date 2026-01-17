@@ -1,4 +1,4 @@
-package math.Tests;
+package mathTests;
 
 import math.Matrix.Matrix3x3;
 import math.LinealAlgebra.Vector3D;

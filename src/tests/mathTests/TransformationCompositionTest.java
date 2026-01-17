@@ -1,4 +1,4 @@
-package math.Tests;
+package mathTests;
 import math.LinearAlgebraEngine;
 import math.LinealAlgebra.Vector4D;
 import org.junit.jupiter.api.Test;

@@ -66,7 +66,7 @@ public class RenderPanel extends Pane {
             lastMousePos[1] = event.getY();
 
             if (editModeEnabled) {
-                handleVertexSelection(event.getX(), event.getY());
+                handleSelection(event.getX(), event.getY()); // ← новый метод
             }
         });
 
@@ -82,6 +82,93 @@ public class RenderPanel extends Pane {
             renderer.handleKeyPress(event.getCode());
             render();
         });
+    }
+
+    private void handleSelection(double mouseX, double mouseY) {
+        if (!editModeEnabled) return;
+
+        double minDistance = Double.MAX_VALUE;
+        int closestVertexIndex = -1;
+        int closestPolygonIndex = -1;
+        Model3D closestModel = null;
+
+        for (Model3D model : models) {
+            if (!model.isVisible()) continue;
+
+            double tx = model.translateXProperty().get();
+            double ty = model.translateYProperty().get();
+            double tz = model.translateZProperty().get();
+            double rx = Math.toRadians(model.rotateXProperty().get());
+            double ry = Math.toRadians(model.rotateYProperty().get());
+            double rz = Math.toRadians(model.rotateZProperty().get());
+            double sx = model.scaleXProperty().get();
+            double sy = model.scaleYProperty().get();
+            double sz = model.scaleZProperty().get();
+
+            for (int i = 0; i < model.getVertices().size(); i++) {
+                Vector3D vertex = model.getVertices().get(i);
+                double[] world = renderer.transformVertex(vertex, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                Vector3D worldVec = new Vector3D((float)world[0], (float)world[1], (float)world[2]);
+                double[] screen = projectVertex(worldVec, model);
+
+                double distance = Math.sqrt(
+                        Math.pow(screen[0] - mouseX, 2) +
+                                Math.pow(screen[1] - mouseY, 2)
+                );
+
+                if (distance < minDistance && distance < 20) {
+                    minDistance = distance;
+                    closestVertexIndex = i;
+                    closestPolygonIndex = -1;
+                    closestModel = model;
+                }
+            }
+
+            for (int i = 0; i < model.getPolygons().size(); i++) {
+                Polygon polygon = model.getPolygons().get(i);
+                List<Integer> indices = polygon.getVertexIndices();
+                if (indices.isEmpty()) continue;
+
+                double centerX = 0, centerY = 0, centerZ = 0;
+                for (int idx : indices) {
+                    Vector3D v = model.getVertices().get(idx);
+                    centerX += v.getX();
+                    centerY += v.getY();
+                    centerZ += v.getZ();
+                }
+                centerX /= indices.size();
+                centerY /= indices.size();
+                centerZ /= indices.size();
+
+                Vector3D center = new Vector3D((float)centerX, (float)centerY, (float)centerZ);
+                double[] world = renderer.transformVertex(center, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                Vector3D worldVec = new Vector3D((float)world[0], (float)world[1], (float)world[2]);
+                double[] screen = projectVertex(worldVec, model);
+
+                double distance = Math.sqrt(
+                        Math.pow(screen[0] - mouseX, 2) +
+                                Math.pow(screen[1] - mouseY, 2)
+                );
+
+                if (distance < minDistance && distance < 30) { // больше радиус для полигонов
+                    minDistance = distance;
+                    closestVertexIndex = -1;
+                    closestPolygonIndex = i;
+                    closestModel = model;
+                }
+            }
+        }
+
+        if (closestModel != null) {
+            if (closestVertexIndex != -1) {
+                editManager.selectVertex(closestVertexIndex);
+                System.out.println("Выбрана вершина #" + closestVertexIndex);
+            } else if (closestPolygonIndex != -1) {
+                editManager.selectPolygon(closestPolygonIndex);
+                System.out.println("Выбран полигон #" + closestPolygonIndex);
+            }
+            render();
+        }
     }
 
     private void handleVertexSelection(double mouseX, double mouseY) {
@@ -122,11 +209,11 @@ public class RenderPanel extends Pane {
         }
 
         if (closestVertexIndex != -1 && closestModel != null) {
-            editManager.selectVertex(closestVertexIndex);
-            render();
-
-            System.out.println("Выбрана вершина #" + closestVertexIndex +
-                    " в модели " + closestModel.getName());
+            if (selectionManager.getActiveModel() == closestModel) {
+                editManager.selectVertex(closestVertexIndex);
+                render();
+                System.out.println("Выбрана вершина #" + closestVertexIndex);
+            }
         }
     }
 
@@ -206,9 +293,12 @@ public class RenderPanel extends Pane {
 
                 Color currentVertexColor = vertexColor;
                 if (editModeEnabled &&
-                        editManager.getSelectedVertexIndex() == i &&
                         selectionManager.getActiveModel() == model) {
-                    currentVertexColor = selectedVertexColor;
+                    if (editManager.getSelectedVertexIndex() == i) {
+                        currentVertexColor = Color.RED;
+                    } else if (editManager.getSelectedPolygonIndex() != -1) {
+                        currentVertexColor = Color.ORANGE;
+                    }
                 }
 
                 gc.setFill(currentVertexColor);

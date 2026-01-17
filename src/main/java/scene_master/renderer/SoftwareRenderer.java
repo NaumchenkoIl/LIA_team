@@ -315,7 +315,7 @@ public class SoftwareRenderer {
     /**
      * Вычисление цвета пикселя
      */
-    private Color calculatePixelColor(Model3D model, double u, double v, double[] normal) {
+    Color calculatePixelColor(Model3D model, double u, double v, double[] normal) {
         Color baseColor = model.getBaseColor();
         boolean hasTexture = useTexture && model.getTexture() != null && !model.getTextureCoords().isEmpty();
 
@@ -333,7 +333,7 @@ public class SoftwareRenderer {
     /**
      * Применение освещения к цвету
      */
-    private Color applyLightingToColor(Color color, double[] normal) {
+    Color applyLightingToColor(Color color, double[] normal) {
         if (normal == null || !useLighting) return color;
 
         double len = Math.sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
@@ -510,4 +510,16 @@ public class SoftwareRenderer {
     }
 
     public Camera getCamera() { return camera; }
+
+    public boolean isUseTexture() {
+        return useTexture;
+    }
+
+    public boolean isUseLighting() {
+        return useLighting;
+    }
+
+    public boolean isRenderWireframe() {
+        return renderWireframe;
+    }
 }

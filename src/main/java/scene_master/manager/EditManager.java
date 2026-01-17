@@ -49,12 +49,9 @@ public class EditManager {
     }
 
     public void selectPolygon(int index) {
-        if (editMode && currentModel != null) {
-            selectedPolygonIndex = index;
-            selectedVertexIndex = -1;
-            System.out.println("Выбран полигон #" + index +
-                    " в модели " + currentModel.getName());
-        }
+        this.selectedPolygonIndex = index;
+        this.selectedVertexIndex = -1;
+        System.out.println("EditManager: выбран полигон " + index);
     }
 
     public void deleteSelectedVertex(Model3D model) {
@@ -86,46 +83,17 @@ public class EditManager {
     }
 
     public void deleteSelectedPolygon(Model3D model) {
-        if (selectedPolygonIndex < 0 || selectedPolygonIndex >= model.getPolygons().size()) {
-            return;
-        }
-
-        model.getPolygons().remove(selectedPolygonIndex);
-        model.calculateVertexNormals();
-        clearSelection();
-    }
-
-    public void deleteVertex(Model3D model, int vertexIndex) {
-        if (vertexIndex >= 0 && vertexIndex < model.getVertices().size()) {
-            ObservableList<Vector3D> vertices = model.getVertices();
-            ObservableList<Polygon> polygons = model.getPolygons();
-
-            vertices.remove(vertexIndex);
-
-            for (int i = polygons.size() - 1; i >= 0; i--) {
-                Polygon polygon = polygons.get(i);
-                List<Integer> indices = polygon.getVertexIndices();
-
-                if (indices.contains(vertexIndex)) {
-                    polygons.remove(i);
-                } else {
-                    List<Integer> newIndices = new ArrayList<>();
-                    for (Integer idx : indices) {
-                        if (idx > vertexIndex) {
-                            newIndices.add(idx - 1);
-                        } else {
-                            newIndices.add(idx);
-                        }
-                    }
-                    polygons.set(i, new Polygon(newIndices));
-                }
-            }
+        if (selectedPolygonIndex >= 0 && selectedPolygonIndex < model.getPolygons().size()) {
+            model.getPolygons().remove(selectedPolygonIndex);
+            clearSelection();
+            System.out.println("Удалён полигон #" + selectedPolygonIndex);
         }
     }
 
-    public void deletePolygon(Model3D model, int polygonIndex) {
-        if (polygonIndex >= 0 && polygonIndex < model.getPolygons().size()) {
-            model.getPolygons().remove(polygonIndex);
+    public void selectAll(Model3D model) {
+        if (model != null) {
+            selectedVertexIndex = model.getVertices().isEmpty() ? -1 : 0;
+            selectedPolygonIndex = model.getPolygons().isEmpty() ? -1 : 0;
         }
     }
 

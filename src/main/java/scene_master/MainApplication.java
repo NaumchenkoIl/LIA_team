@@ -124,7 +124,7 @@ public class MainApplication extends Application {
         deletePolygonItem.setOnAction(e -> deleteSelectedPolygon());
 
         MenuItem selectAllItem = new MenuItem("Выделить всё");
-        selectAllItem.setOnAction(e -> selectAllModels());
+        selectAllItem.setOnAction(e -> selectAll());
         MenuItem deselectAllItem = new MenuItem("Снять выделение");
         deselectAllItem.setOnAction(e -> clearSelection());
 
@@ -729,7 +729,7 @@ public class MainApplication extends Application {
 
     private void addTestModel() {
         try {
-            String filePath = "C:/Users/Александр/Desktop/for3person/LIA_team/src/test/test_cube.obj";
+            String filePath = "C:/Users/Александр/Desktop/for3person/LIA_team/src/tests/test_cube.obj";
             ObjReader reader = new ObjReader();
             Model originalModel = reader.readModel(filePath);
             Triangulator triangulator = new Triangulator();
@@ -1097,6 +1097,25 @@ public class MainApplication extends Application {
             } catch (Exception e) {
                 ErrorHandler.handleException(e, "дублирование модели");
             }
+        }
+    }
+
+    private void selectAll() {
+        if (editManager.isEditMode()) {
+            Model3D activeModel = selectionManager.getActiveModel();
+            if (activeModel != null) {
+                editManager.selectAll(activeModel);
+                renderPanel.render();
+                DialogHelper.showInfoDialog("Выделение",
+                        "Выделено: " + activeModel.getVertices().size() + " вершин, " +
+                                activeModel.getPolygons().size() + " полигонов");
+            }
+        } else {
+            modelListView.getSelectionModel().selectAll();
+            for (ModelWrapper wrapper : modelListView.getItems()) {
+                selectionManager.selectModel(wrapper.getUIModel());
+            }
+            updateStatistics();
         }
     }
 

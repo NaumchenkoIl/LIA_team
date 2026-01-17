@@ -1,4 +1,4 @@
-package math.Tests;
+package mathTests;
 
 import math.LinearAlgebraEngine;
 import math.Matrix.Matrix4x4;
