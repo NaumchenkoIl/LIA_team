@@ -1,0 +1,23 @@
+<component name="ArtifactManager">
+  <artifact name="scene-master:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/scene_master_jar</output-path>
+    <root id="root">
+      <element id="archive" name="scene-master.jar">
+        <element id="module-output" name="scene-master" />
+      </element>
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-controls:22.0.1" />
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-fxml:win:22.0.1" />
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-fxml:22.0.1" />
+      <element id="file-copy" path="$USER_HOME$/Downloads/Telegram Desktop/junit-jupiter-api-5.10.0.jar" />
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-graphics:win:22.0.1" />
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-base:22.0.1" />
+      <element id="file-copy" path="$USER_HOME$/Downloads/Telegram Desktop/junit-platform-commons-1.10.0.jar" />
+      <element id="file-copy" path="$USER_HOME$/Downloads/Telegram Desktop/opentest4j-1.3.0.jar" />
+      <element id="file-copy" path="$USER_HOME$/Downloads/Telegram Desktop/apiguardian-api-1.1.2.jar" />
+      <element id="file-copy" path="$USER_HOME$/Downloads/Telegram Desktop/junit-jupiter-engine-5.10.0.jar" />
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-base:win:22.0.1" />
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-controls:win:22.0.1" />
+      <element id="library" level="project" name="Maven: org.openjfx:javafx-graphics:22.0.1" />
+    </root>
+  </artifact>
+</component>

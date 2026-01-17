@@ -1,7 +1,7 @@
 import scene_master.calculator.Triangulator;
 import scene_master.model.Model;
 import scene_master.model.Polygon;
-import scene_master.model.Vector3D;
+import math.LinealAlgebra.Vector3D;
 import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.List;
