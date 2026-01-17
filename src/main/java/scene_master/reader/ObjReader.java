@@ -19,8 +19,7 @@ public class ObjReader {
     public Model readModel(String filename) throws IOException {
         Model model = new Model();
 
-        // Проверка существования файла
-        java.io.File file = new java.io.File(filename);
+        java.io.File file = new java.io.File(filename);// проверка существования файла
         if (!file.exists()) {
             throw new IOException("Файл не найден: " + filename);
         }
@@ -63,12 +62,11 @@ public class ObjReader {
                             break;
                         case "mtllib": // библиотека материалов
                         case "usemtl": // использование материала
-                        case "s":      // сглаживание
-                        case "o":      // объект
-                        case "g":      // группа
-                            // Игнорируем эти директивы, но логируем
+                        case "s":  // сглаживание
+                        case "o":  // объект
+                        case "g":  // группа
                             System.out.println("Директива [" + tokens[0] + "] проигнорирована (строка " + lineNumber + ")");
-                            break;
+                            break;// игнорируем эти директивы, но логируем
                         default:
                             System.out.println("Неизвестная директива [" + tokens[0] + "] проигнорирована (строка " + lineNumber + ")");
                     }
@@ -81,8 +79,7 @@ public class ObjReader {
             throw new IOException("Ошибка чтения файла '" + filename + "': " + e.getMessage(), e);
         }
 
-        // Проверяем валидность модели
-        if (model.getVertices().isEmpty()) {
+        if (model.getVertices().isEmpty()) {// проверяем валидность модели
             throw new IOException("Модель не содержит вершин");
         }
 
@@ -159,35 +156,30 @@ public class ObjReader {
         for (int i = 1; i < tokens.length; i++) {
             String vertexToken = tokens[i];
 
-            // Разделяем на части
-            String[] parts = vertexToken.split("/");
+            String[] parts = vertexToken.split("/"); // разделяем на части
 
             if (parts.length == 0 || parts[0].isEmpty()) {
                 throw new IllegalArgumentException("Недопустимый формат вершины полигона (строка " + lineNumber + ")");
             }
 
-            // Индекс вершины (обязательный)
-            int vertexIndex = parseInteger(parts[0]);
+            int vertexIndex = parseInteger(parts[0]);// индекс вершины (обязательный)
             int actualVertexIndex = convertIndex(vertexIndex, model.getVertices().size(), "вершины", lineNumber);
             vertexIndices.add(actualVertexIndex);
 
-            // Индекс текстуры (опциональный)
-            if (parts.length >= 2 && !parts[1].isEmpty()) {
+            if (parts.length >= 2 && !parts[1].isEmpty()) {// индекс текстуры (опциональный)
                 int textureIndex = parseInteger(parts[1]);
                 int actualTextureIndex = convertIndex(textureIndex, texturePoints.size(), "текстуры", lineNumber);
                 textureIndices.add(actualTextureIndex);
             }
 
-            // Индекс нормали (опциональный)
-            if (parts.length >= 3 && !parts[2].isEmpty()) {
+            if (parts.length >= 3 && !parts[2].isEmpty()) {// индекс нормали (опциональный)
                 int normalIndex = parseInteger(parts[2]);
                 int actualNormalIndex = convertIndex(normalIndex, model.getNormals().size(), "нормали", lineNumber);
                 normalIndices.add(actualNormalIndex);
             }
         }
 
-        // Создаем полигон
-        Polygon polygon = new Polygon(vertexIndices);
+        Polygon polygon = new Polygon(vertexIndices); // создаем полигон
 
         if (!textureIndices.isEmpty()) {
             polygon.setTextureIndices(textureIndices);
@@ -226,15 +218,14 @@ public class ObjReader {
      */
     private double parseDoubleWithComma(String str) throws NumberFormatException, ParseException {
         try {
-            // Сначала пробуем стандартный парсинг (для точек)
-            return Double.parseDouble(str);
+            return Double.parseDouble(str);// сначала пробуем стандартный парсинг (для точек)
         } catch (NumberFormatException e1) {
             try {
-                // Если не получилось, пробуем заменить запятую на точку
-                String normalized = str.replace(',', '.');
+
+                String normalized = str.replace(',', '.');// если не получилось, пробуем заменить запятую на точку
                 return Double.parseDouble(normalized);
             } catch (NumberFormatException e2) {
-                // Если и это не сработало, используем NumberFormat с локалью
+                //если и это не сработало, используем NumberFormat с локалью
                 NumberFormat format = NumberFormat.getInstance(Locale.FRANCE); // Используем локаль с запятой
                 return format.parse(str).doubleValue();
             }

@@ -12,33 +12,28 @@ class TriangulatorTest {
 
     @Test
     void testTriangulateSquare() {
-        // Создаем квадрат
-        Model model = new Model();
+        Model model = new Model();// создаем квадрат
         model.addVertex(new Vector3D(0, 0, 0)); // 0
         model.addVertex(new Vector3D(1, 0, 0)); // 1
         model.addVertex(new Vector3D(1, 1, 0)); // 2
         model.addVertex(new Vector3D(0, 1, 0)); // 3
 
-        // Квадрат (4 вершины)
-        Polygon square = new Polygon(Arrays.asList(0, 1, 2, 3));
+        Polygon square = new Polygon(Arrays.asList(0, 1, 2, 3));// квадрат (4 вершины)
         model.addPolygon(square);
 
         Triangulator triangulator = new Triangulator();
         triangulator.triangulateModel(model);
 
-        // После триангуляции должно быть 2 треугольника
-        assertEquals(2, model.getPolygons().size());
+        assertEquals(2, model.getPolygons().size());// после триангуляции должно быть 2 треугольника
 
-        // Проверяем, что все полигоны - треугольники
-        for (Polygon p : model.getPolygons()) {
+        for (Polygon p : model.getPolygons()) {// проверяем, что все полигоны - треугольники
             assertEquals(3, p.getVertexIndices().size());
         }
     }
 
     @Test
     void testTriangulateTriangle() {
-        // Треугольник должен остаться треугольником
-        Model model = new Model();
+        Model model = new Model();// треугольник должен остаться треугольником
         model.addVertex(new Vector3D(0, 0, 0));
         model.addVertex(new Vector3D(1, 0, 0));
         model.addVertex(new Vector3D(0, 1, 0));
@@ -49,16 +44,14 @@ class TriangulatorTest {
         Triangulator triangulator = new Triangulator();
         triangulator.triangulateModel(model);
 
-        // Должен остаться 1 полигон
-        assertEquals(1, model.getPolygons().size());
+        assertEquals(1, model.getPolygons().size());// должен остаться 1 полигон
         assertEquals(3, model.getPolygons().get(0).getVertexIndices().size());
     }
 
     @Test
     void testPentagonTriangulation() {
-        // Пятиугольник
         Model model = new Model();
-        model.addVertex(new Vector3D(0, 0, 0));   // 0
+        model.addVertex(new Vector3D(0, 0, 0));   // пятиугольник
         model.addVertex(new Vector3D(2, 0, 0));   // 1
         model.addVertex(new Vector3D(3, 1, 0));   // 2
         model.addVertex(new Vector3D(1, 2, 0));   // 3
@@ -70,8 +63,7 @@ class TriangulatorTest {
         Triangulator triangulator = new Triangulator();
         triangulator.triangulateModel(model);
 
-        // Пятиугольник должен быть разбит на 3 треугольника
-        assertEquals(3, model.getPolygons().size());
+        assertEquals(3, model.getPolygons().size());// пятиугольник должен быть разбит на 3 треугольника
 
         for (Polygon p : model.getPolygons()) {
             assertEquals(3, p.getVertexIndices().size());
@@ -91,8 +83,8 @@ class TriangulatorTest {
         Triangulator triangulator = new Triangulator();
         List<Polygon> triangles = triangulator.triangulatePolygon(model, convex);
 
-        // Выпуклый четырехугольник -> 2 треугольника
-        assertEquals(2, triangles.size());
+
+        assertEquals(2, triangles.size());// выпуклый четырехугольник -> 2 треугольника
     }
 
     @Test
@@ -100,8 +92,7 @@ class TriangulatorTest {
         Model model = new Model();
         Triangulator triangulator = new Triangulator();
 
-        // Не должно быть исключений
-        assertDoesNotThrow(() -> triangulator.triangulateModel(model));
+        assertDoesNotThrow(() -> triangulator.triangulateModel(model));// не должно быть исключений
         assertEquals(0, model.getPolygons().size());
     }
 
@@ -109,7 +100,6 @@ class TriangulatorTest {
     void testNullModel() {
         Triangulator triangulator = new Triangulator();
 
-        // Не должно быть исключений при null
-        assertDoesNotThrow(() -> triangulator.triangulateModel(null));
+        assertDoesNotThrow(() -> triangulator.triangulateModel(null));// не должно быть исключений при null
     }
 }
