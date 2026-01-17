@@ -19,7 +19,7 @@ public class TextureLoader {
     }
 
     public static Image createDefaultTexture(int width, int height) {
-        // Создаем простую текстуру по умолчанию (шахматная доска)
+        // создаем простую текстуру по умолчанию (шахматная доска)
         javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(width, height);
         javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
 

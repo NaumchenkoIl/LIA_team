@@ -340,19 +340,19 @@ public class MainApplication extends Application {
 
         HBox buttonBox = new HBox(8);
         Button resetBtn = new Button("Сбросить");
-        Button applyBtn = new Button("Применить");
+
 
         resetBtn.setMinWidth(Region.USE_PREF_SIZE);
-        applyBtn.setMinWidth(Region.USE_PREF_SIZE);
+
         resetBtn.setMaxWidth(Double.MAX_VALUE);
-        applyBtn.setMaxWidth(Double.MAX_VALUE);
+
         HBox.setHgrow(resetBtn, Priority.ALWAYS);
-        HBox.setHgrow(applyBtn, Priority.ALWAYS);
+
 
         resetBtn.setOnAction(e -> resetTransformations());
-        applyBtn.setOnAction(e -> applyTransformations());
 
-        buttonBox.getChildren().addAll(resetBtn, applyBtn);
+
+ 
         buttonBox.setAlignment(Pos.CENTER);
 
         Slider ambientSlider = createSliderOnly("Ambient Light", 0, 1, 0.3);
