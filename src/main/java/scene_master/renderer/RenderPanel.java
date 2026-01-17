@@ -6,6 +6,9 @@ import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import math.Camera;
 import math.LinealAlgebra.Vector3D;
+import math.Matrix.Matrix4x4;
+import scene_master.manager.EditManager;
+import scene_master.manager.SelectionManager;
 import scene_master.model.Model3D;
 import scene_master.model.Polygon;
 
@@ -27,8 +30,13 @@ public class RenderPanel extends Pane {
     private double vertexSize = 5.0;
     private Color vertexColor = Color.YELLOW;
     private Color selectedVertexColor = Color.RED;
+    private EditManager editManager = new EditManager();
+    private SelectionManager selectionManager;
 
-    public RenderPanel(double width, double height) {
+    public RenderPanel(double width, double height, SelectionManager selectionManager, EditManager editManager) {
+        this.selectionManager = selectionManager;
+        this.editManager = editManager;
+
         canvas = new Canvas(width, height);
         getChildren().add(canvas);
 
@@ -96,9 +104,9 @@ public class RenderPanel extends Pane {
 
             for (int i = 0; i < model.getVertices().size(); i++) {
                 Vector3D vertex = model.getVertices().get(i);
-                double[] transformed = renderer.transformVertex(vertex,
-                        tx, ty, tz, rx, ry, rz, sx, sy, sz);
-                double[] screen = projectVertex(transformed);
+                double[] world = renderer.transformVertex(vertex, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+                Vector3D worldVec = new Vector3D((float)world[0], (float)world[1], (float)world[2]);
+                double[] screen = projectVertex(worldVec, model);
 
                 double distance = Math.sqrt(
                         Math.pow(screen[0] - mouseX, 2) +
@@ -114,20 +122,35 @@ public class RenderPanel extends Pane {
         }
 
         if (closestVertexIndex != -1 && closestModel != null) {
+            editManager.selectVertex(closestVertexIndex);
+            render();
+
             System.out.println("Выбрана вершина #" + closestVertexIndex +
                     " в модели " + closestModel.getName());
         }
     }
 
-    private double[] projectVertex(double[] vertex) {
-        double scale = 200;
-        double centerX = canvas.getWidth() / 2;
-        double centerY = canvas.getHeight() / 2;
+    private double[] projectVertex(Vector3D vertex, Model3D model) {
+        double tx = model.translateXProperty().get();
+        double ty = model.translateYProperty().get();
+        double tz = model.translateZProperty().get();
+        double rx = Math.toRadians(model.rotateXProperty().get());
+        double ry = Math.toRadians(model.rotateYProperty().get());
+        double rz = Math.toRadians(model.rotateZProperty().get());
+        double sx = model.scaleXProperty().get();
+        double sy = model.scaleYProperty().get();
+        double sz = model.scaleZProperty().get();
 
-        double screenX = centerX + vertex[0] * scale;
-        double screenY = centerY - vertex[1] * scale;
+        double[] world = renderer.transformVertex(vertex, tx, ty, tz, rx, ry, rz, sx, sy, sz);
 
-        return new double[]{screenX, screenY};
+        Matrix4x4 viewMatrix = camera.getViewMatrix();
+        Matrix4x4 projectionMatrix = camera.getProjectionMatrix();
+
+        return renderer.projectWithCamera(world, viewMatrix, projectionMatrix);
+    }
+
+    public Camera getCamera() {
+        return camera;
     }
 
     public void addModel(Model3D model) {
@@ -174,11 +197,19 @@ public class RenderPanel extends Pane {
 
             for (int i = 0; i < model.getVertices().size(); i++) {
                 Vector3D vertex = model.getVertices().get(i);
-                double[] transformed = renderer.transformVertex(vertex,
-                        tx, ty, tz, rx, ry, rz, sx, sy, sz);
-                double[] screen = projectVertex(transformed);
 
-                Color currentVertexColor = editModeEnabled ? selectedVertexColor : vertexColor;
+                double[] world = renderer.transformVertex(vertex, tx, ty, tz, rx, ry, rz, sx, sy, sz);
+
+                Vector3D worldVec = new Vector3D((float)world[0], (float)world[1], (float)world[2]);
+
+                double[] screen = projectVertex(worldVec, model);
+
+                Color currentVertexColor = vertexColor;
+                if (editModeEnabled &&
+                        editManager.getSelectedVertexIndex() == i &&
+                        selectionManager.getActiveModel() == model) {
+                    currentVertexColor = selectedVertexColor;
+                }
 
                 gc.setFill(currentVertexColor);
                 gc.fillOval(screen[0] - vertexSize/2, screen[1] - vertexSize/2,
@@ -228,9 +259,8 @@ public class RenderPanel extends Pane {
             centerZ /= indices.size();
 
             Vector3D center = new Vector3D((float)centerX, (float)centerY, (float)centerZ);
-            double[] transformed = renderer.transformVertex(center,
-                    tx, ty, tz, rx, ry, rz, sx, sy, sz);
-            double[] screen = projectVertex(transformed);
+
+            double[] screen = projectVertex(center, model); // ← ПЕРЕДАЁМ Vector3D и Model3D
 
             gc.setFill(Color.LIMEGREEN);
             gc.fillRect(screen[0] - 4, screen[1] - 4, 8, 8);

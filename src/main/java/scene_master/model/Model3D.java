@@ -37,12 +37,10 @@ public class Model3D {
         this.name.set(name);
     }
 
-    // Текстура
     public ObjectProperty<Image> textureProperty() { return texture; }
     public Image getTexture() { return texture.get(); }
     public void setTexture(Image texture) { this.texture.set(texture); }
 
-    // UV-координаты
     public void addTextureCoord(double u, double v) {
         textureCoords.add(new TextureCoordinate(u, v));
     }
@@ -60,39 +58,95 @@ public class Model3D {
             List<Integer> indices = polygon.getVertexIndices();
             List<Integer> texIndices = polygon.getTextureIndices();
 
+            double u = 0.5, v = 0.5;
+
             if (texIndices != null && texIndices.size() > vertexIndexInPolygon) {
                 int texIndex = texIndices.get(vertexIndexInPolygon);
                 if (texIndex >= 0 && texIndex < textureCoords.size()) {
                     TextureCoordinate tc = textureCoords.get(texIndex);
-                    return new double[]{tc.u, tc.v};
+                    u = tc.u;
+                    v = tc.v;
                 }
-            }
-
-            if (vertexIndexInPolygon < indices.size()) {
+            } else if (vertexIndexInPolygon < indices.size()) {
                 int vertexIndex = indices.get(vertexIndexInPolygon);
                 if (vertexIndex < vertices.size()) {
                     Vector3D vertex = vertices.get(vertexIndex);
-                    double u = (vertex.getX() + 1) / 2;
-                    double v = (vertex.getY() + 1) / 2;
-
-                    u *= getTextureScaleU();
-                    v *= getTextureScaleV();
-
-                    return new double[]{u, v};
+                    u = (vertex.getX() + 1) / 2;
+                    v = (vertex.getY() + 1) / 2;
                 }
             }
+
+            u *= getTextureScaleU();
+            v *= getTextureScaleV();
+
+            return new double[]{u, v};
         } catch (Exception e) {
             e.printStackTrace();
+            return new double[]{0.5, 0.5};
         }
-        return new double[]{0.5, 0.5};
     }
 
-    // Цвет
+    public void generateUVFromGeometry() {
+        textureCoords.clear();
+
+        for (Polygon polygon : polygons) {
+            List<Integer> indices = polygon.getVertexIndices();
+            if (indices.size() < 3) continue;
+
+            Vector3D v1 = vertices.get(indices.get(0));
+            Vector3D v2 = vertices.get(indices.get(1));
+            Vector3D v3 = vertices.get(indices.get(2));
+
+            double nx = Math.abs(polygon.getNormal().getX());
+            double ny = Math.abs(polygon.getNormal().getY());
+            double nz = Math.abs(polygon.getNormal().getZ());
+
+            String plane = "XY";
+            if (nz > nx && nz > ny) plane = "XY"; // Z-нормаль → проецируем на XY
+            else if (ny > nx && ny > nz) plane = "XZ"; // Y-нормаль → проецируем на XZ
+            else if (nx > ny && nx > nz) plane = "YZ"; // X-нормаль → проецируем на YZ
+
+            for (int i = 0; i < indices.size(); i++) {
+                Vector3D vertex = vertices.get(indices.get(i));
+                double u, v;
+
+                switch (plane) {
+                    case "XY":
+                        u = vertex.getX();
+                        v = vertex.getY();
+                        break;
+                    case "XZ":
+                        u = vertex.getX();
+                        v = vertex.getZ();
+                        break;
+                    case "YZ":
+                        u = vertex.getY();
+                        v = vertex.getZ();
+                        break;
+                    default:
+                        u = vertex.getX();
+                        v = vertex.getY();
+                }
+
+                u = (u + 1) / 2;
+                v = (v + 1) / 2;
+
+                addTextureCoord(u, v);
+            }
+        }
+
+        for (Polygon polygon : polygons) {
+            polygon.setTextureIndices(new ArrayList<>());
+            for (int i = 0; i < polygon.getVertexIndices().size(); i++) {
+                polygon.addTextureIndex(i);
+            }
+        }
+    }
+
     public ObjectProperty<Color> baseColorProperty() { return baseColor; }
     public Color getBaseColor() { return baseColor.get(); }
     public void setBaseColor(Color color) { baseColor.set(color); }
 
-    // Свойства модели
     public StringProperty nameProperty() { return name; }
     public BooleanProperty visibleProperty() { return visible; }
     public ObservableList<Vector3D> getVertices() { return vertices; }
@@ -100,7 +154,6 @@ public class Model3D {
     public ObservableList<Vector3D> getNormals() { return normals; }
     public ObservableList<Polygon> getPolygons() { return polygons; }
 
-    // Трансформации
     public DoubleProperty translateXProperty() { return translateX; }
     public DoubleProperty translateYProperty() { return translateY; }
     public DoubleProperty translateZProperty() { return translateZ; }
@@ -114,7 +167,6 @@ public class Model3D {
     public String getName() { return name.get(); }
     public boolean isVisible() { return visible.get(); }
 
-    // Масштабирование текстуры
     public DoubleProperty textureScaleUProperty() { return textureScaleU; }
     public DoubleProperty textureScaleVProperty() { return textureScaleV; }
     public double getTextureScaleU() { return textureScaleU.get(); }

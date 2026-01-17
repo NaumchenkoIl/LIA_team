@@ -43,12 +43,9 @@ public class EditManager {
     }
 
     public void selectVertex(int index) {
-        if (editMode && currentModel != null) {
-            selectedVertexIndex = index;
-            selectedPolygonIndex = -1;
-            System.out.println("Выбрана вершина #" + index +
-                    " в модели " + currentModel.getName());
-        }
+        this.selectedVertexIndex = index;
+        this.selectedPolygonIndex = -1; // сбрасываем выбор полигона
+        System.out.println("EditManager: выбрана вершина " + index);
     }
 
     public void selectPolygon(int index) {
@@ -61,40 +58,41 @@ public class EditManager {
     }
 
     public void deleteSelectedVertex(Model3D model) {
-        if (selectedVertexIndex >= 0 && selectedVertexIndex < model.getVertices().size()) {
-            ObservableList<Vector3D> vertices = model.getVertices();
-            ObservableList<Polygon> polygons = model.getPolygons();
+        if (selectedVertexIndex < 0 || selectedVertexIndex >= model.getVertices().size()) {
+            return;
+        }
 
-            vertices.remove(selectedVertexIndex);
+        int vertexToDelete = selectedVertexIndex;
+        model.getVertices().remove(vertexToDelete);
 
-            for (int i = polygons.size() - 1; i >= 0; i--) {
-                Polygon polygon = polygons.get(i);
-                List<Integer> indices = polygon.getVertexIndices();
+        for (int i = model.getPolygons().size() - 1; i >= 0; i--) {
+            Polygon polygon = model.getPolygons().get(i);
+            List<Integer> indices = polygon.getVertexIndices();
 
-                if (indices.contains(selectedVertexIndex)) {
-                    polygons.remove(i);
-                } else {
-                    List<Integer> newIndices = new ArrayList<>();
-                    for (Integer idx : indices) {
-                        if (idx > selectedVertexIndex) {
-                            newIndices.add(idx - 1);
-                        } else {
-                            newIndices.add(idx);
-                        }
-                    }
-                    polygons.set(i, new Polygon(newIndices));
-                }
+            if (indices.contains(vertexToDelete)) {
+                model.getPolygons().remove(i);
+                continue;
             }
 
-            clearSelection();
+            List<Integer> newIndices = new ArrayList<>();
+            for (Integer idx : indices) {
+                newIndices.add(idx > vertexToDelete ? idx - 1 : idx);
+            }
+            polygon.setVertexIndices(newIndices);
         }
+
+        model.calculateVertexNormals();
+        clearSelection();
     }
 
     public void deleteSelectedPolygon(Model3D model) {
-        if (selectedPolygonIndex >= 0 && selectedPolygonIndex < model.getPolygons().size()) {
-            model.getPolygons().remove(selectedPolygonIndex);
-            clearSelection();
+        if (selectedPolygonIndex < 0 || selectedPolygonIndex >= model.getPolygons().size()) {
+            return;
         }
+
+        model.getPolygons().remove(selectedPolygonIndex);
+        model.calculateVertexNormals();
+        clearSelection();
     }
 
     public void deleteVertex(Model3D model, int vertexIndex) {

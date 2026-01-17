@@ -317,12 +317,16 @@ public class SoftwareRenderer {
      */
     private Color calculatePixelColor(Model3D model, double u, double v, double[] normal) {
         Color baseColor = model.getBaseColor();
-        if (useTexture && model.getTexture() != null && !model.getTextureCoords().isEmpty()) {
+        boolean hasTexture = useTexture && model.getTexture() != null && !model.getTextureCoords().isEmpty();
+
+        if (hasTexture) {
             baseColor = textureManager.getTextureColor(model.getTexture(), u, v);
         }
+
         if (useLighting && normal != null) {
             baseColor = applyLightingToColor(baseColor, normal);
         }
+
         return baseColor;
     }
 
@@ -466,7 +470,7 @@ public class SoftwareRenderer {
     /**
      * Проекция с камерой
      */
-    private double[] projectWithCamera(double[] worldPos, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix) {
+    public double[] projectWithCamera(double[] worldPos, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix) {
         Vector4D world = new Vector4D((float)worldPos[0], (float)worldPos[1], (float)worldPos[2], 1.0f);
         Vector4D view = viewMatrix.multiply(world);
         Vector4D clip = projectionMatrix.multiply(view);
@@ -504,4 +508,6 @@ public class SoftwareRenderer {
     public double getDiffuseIntensity() {
         return diffuseIntensity;
     }
+
+    public Camera getCamera() { return camera; }
 }

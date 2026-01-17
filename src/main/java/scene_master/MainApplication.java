@@ -224,7 +224,7 @@ public class MainApplication extends Application {
 
                 activeModel.setTexture(texture);
                 if (activeModel.getTextureCoords().isEmpty()) {
-                    createDefaultUVCoordinates(activeModel);
+                    activeModel.generateUVFromGeometry();
                 }
 
                 if (renderPanel != null) {
@@ -303,8 +303,7 @@ public class MainApplication extends Application {
     }
 
     private Pane createCenterPanel() {
-        renderPanel = new RenderPanel(800, 600);
-        renderPanel.getStyleClass().add("view-3d");
+        renderPanel = new RenderPanel(800, 600, selectionManager, editManager);        renderPanel.getStyleClass().add("view-3d");
         renderPanel.setStyle("-fx-background-color: #1a1a2e;");
 
         sceneManager.getModelWrappers().addListener((ListChangeListener<ModelWrapper>) change -> {
@@ -321,12 +320,12 @@ public class MainApplication extends Application {
 
         return renderPanel;
     }
-
     private VBox createRightPanel() {
         VBox rightPanel = new VBox(10);
         rightPanel.getStyleClass().add("right-panel");
         rightPanel.setPadding(new Insets(10));
         rightPanel.setPrefWidth(300);
+        rightPanel.setMaxWidth(300); // ← важно для ограничения
 
         Label propertiesLabel = new Label("Свойства модели");
         propertiesLabel.getStyleClass().add("section-label");
@@ -338,16 +337,23 @@ public class MainApplication extends Application {
         transformLabel.getStyleClass().add("section-label");
 
         VBox transformsPanel = createTransformsPanel();
-        HBox buttonBox = new HBox(10);
+
+        HBox buttonBox = new HBox(8);
         Button resetBtn = new Button("Сбросить");
         Button applyBtn = new Button("Применить");
+
+        resetBtn.setMinWidth(Region.USE_PREF_SIZE);
+        applyBtn.setMinWidth(Region.USE_PREF_SIZE);
+        resetBtn.setMaxWidth(Double.MAX_VALUE);
+        applyBtn.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(resetBtn, Priority.ALWAYS);
+        HBox.setHgrow(applyBtn, Priority.ALWAYS);
 
         resetBtn.setOnAction(e -> resetTransformations());
         applyBtn.setOnAction(e -> applyTransformations());
 
         buttonBox.getChildren().addAll(resetBtn, applyBtn);
         buttonBox.setAlignment(Pos.CENTER);
-
 
         Slider ambientSlider = createSliderOnly("Ambient Light", 0, 1, 0.3);
         Slider diffuseSlider = createSliderOnly("Diffuse Intensity", 0, 1, 0.7);
@@ -357,13 +363,27 @@ public class MainApplication extends Application {
                 renderPanel.setDiffuseIntensity(n.doubleValue()));
 
         rightPanel.getChildren().addAll(
-                propertiesLabel, modelPropertiesPanel,
-                new Separator(), transformLabel, transformsPanel, buttonBox,
-                new Separator(), new Label("Параметры освещения"),
-                new HBox(10, new Label("Ambient:"), ambientSlider),
-                new HBox(10, new Label("Diffuse:"), diffuseSlider)
+                propertiesLabel,
+                modelPropertiesPanel,
+                new Separator(),
+                transformLabel,
+                transformsPanel,
+                buttonBox,
+                new Separator(),
+                new Label("Параметры освещения"),
+                createLabeledSlider("Ambient:", ambientSlider),
+                createLabeledSlider("Diffuse:", diffuseSlider)
         );
+
         return rightPanel;
+    }
+
+    private HBox createLabeledSlider(String label, Slider slider) {
+        Label nameLabel = new Label(label);
+        nameLabel.setPrefWidth(60);
+        HBox box = new HBox(5, nameLabel, slider);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
     }
 
     private VBox createTransformsPanel() {
@@ -510,9 +530,11 @@ public class MainApplication extends Application {
 
     private Slider createSliderOnly(String label, double min, double max, double initial) {
         Slider slider = new Slider(min, max, initial);
-        slider.setShowTickLabels(true);
-        slider.setShowTickMarks(true);
-        slider.setMajorTickUnit((max - min) / 4);
+        slider.setShowTickLabels(false); // ← убираем подписи, чтобы сэкономить место
+        slider.setShowTickMarks(false);
+        slider.setMinWidth(100);
+        slider.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(slider, Priority.ALWAYS);
         return slider;
     }
 
@@ -620,10 +642,15 @@ public class MainApplication extends Application {
                     Model loadedModel = objReader.readModel(file.getAbsolutePath());
                     Triangulator triangulator = new Triangulator();
                     triangulator.triangulateModel(loadedModel);
-                    return new ModelWrapper(loadedModel, file.getName().replace(".obj", ""));
+
+                    ModelWrapper wrapper = new ModelWrapper(loadedModel, file.getName().replace(".obj", ""));
+
+                    wrapper.getUIModel().generateUVFromGeometry();
+                    wrapper.getUIModel().calculateVertexNormals();
+
+                    return wrapper;
                 }
             };
-
             loadTask.setOnSucceeded(event -> {
                 ModelWrapper wrapper = loadTask.getValue();
                 sceneManager.addModelWrapper(wrapper);
@@ -843,6 +870,9 @@ public class MainApplication extends Application {
 
     private void setEditMode(boolean enabled) {
         editManager.setEditMode(enabled);
+        if (renderPanel != null) {
+            renderPanel.setEditModeEnabled(enabled);
+        }
         if (enabled) {
             DialogHelper.showInfoDialog("Режим редактирования",
                     "Режим редактирования включен.\n" +
@@ -872,6 +902,7 @@ public class MainApplication extends Application {
         if (activeModel != null && editManager.isEditMode()) {
             if (editManager.getSelectedVertexIndex() != -1) {
                 editManager.deleteSelectedVertex(activeModel);
+                renderPanel.render();
                 updateModelPropertiesPanel(activeModel);
                 updateStatistics();
                 DialogHelper.showInfoDialog("Успех", "Вершина удалена");
@@ -886,9 +917,10 @@ public class MainApplication extends Application {
         if (activeModel != null && editManager.isEditMode()) {
             if (editManager.getSelectedPolygonIndex() != -1) {
                 editManager.deleteSelectedPolygon(activeModel);
+                renderPanel.render();
                 updateModelPropertiesPanel(activeModel);
                 updateStatistics();
-                DialogHelper.showInfoDialog("Успех", "Полигон удален");
+                DialogHelper.showInfoDialog("Успех", "Полигон удалён");
             } else {
                 DialogHelper.showWarningDialog("Внимание", "Выберите полигон для удаления");
             }
@@ -898,6 +930,8 @@ public class MainApplication extends Application {
     private void selectAllModels() {
         sceneManager.getModelWrappers().forEach(w -> selectionManager.selectModel(w.getUIModel()));
     }
+
+
 
     private void clearSelection() {
         selectionManager.clearSelection();

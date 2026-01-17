@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import math.LinealAlgebra.Vector3D;
 
 public class Polygon {
-    private final List<Integer> vertexIndices;
+    private List<Integer> vertexIndices;
     private List<Integer> textureIndices;
     private List<Integer> normalIndices;
     private Vector3D normal;
@@ -51,6 +51,11 @@ public class Polygon {
 
     public List<Integer> getVertexIndices() {
         return this.vertexIndices;
+    }
+
+    public void setVertexIndices(List<Integer> indices) {
+        this.vertexIndices.clear();
+        this.vertexIndices.addAll(indices);
     }
 
     public int[] getVertexIndicesArray() {
