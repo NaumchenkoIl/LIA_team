@@ -213,22 +213,15 @@ public final class Matrix4x4 extends AbstractMatrix<Matrix4x4, Vector4D> {
         return rotationZ((float) Math.toRadians(angleDeg));
     }
 
-    // камера
     public static Matrix4x4 lookAt(Vector3D eye, Vector3D target, Vector3D up) {
-
-        // направление взгляда (z-ось камеры)
-        Vector3D zAxis = target.subtract(eye).normalize();
-
-        // правая ось (x-ось камеры) = up × z
-        Vector3D xAxis = up.cross(zAxis).normalize();
-
-        // вектор "вверх" (y-ось камеры) = z × x
-        Vector3D yAxis = zAxis.cross(xAxis);
+        Vector3D forward = eye.subtract(target).normalize();
+        Vector3D right = up.cross(forward).normalize();
+        Vector3D cameraUp = forward.cross(right).normalize();
 
         return new Matrix4x4(new float[][]{
-                {xAxis.getX(), xAxis.getY(), xAxis.getZ(), -xAxis.dot(eye)},
-                {yAxis.getX(), yAxis.getY(), yAxis.getZ(), -yAxis.dot(eye)},
-                {zAxis.getX(), zAxis.getY(), zAxis.getZ(), -zAxis.dot(eye)},
+                {right.getX(), right.getY(), right.getZ(), -right.dot(eye)},
+                {cameraUp.getX(), cameraUp.getY(), cameraUp.getZ(), -cameraUp.dot(eye)},
+                {forward.getX(), forward.getY(), forward.getZ(), -forward.dot(eye)},
                 {0f, 0f, 0f, 1f}
         });
     }

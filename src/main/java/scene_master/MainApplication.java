@@ -369,6 +369,7 @@ public class MainApplication extends Application {
                 transformLabel,
                 transformsPanel,
                 buttonBox,
+                resetBtn,
                 new Separator(),
                 new Label("Параметры освещения"),
                 createLabeledSlider("Ambient:", ambientSlider),

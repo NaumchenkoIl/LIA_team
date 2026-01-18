@@ -87,8 +87,27 @@ public class Model3D {
     }
 
     public void generateUVFromGeometry() {
+        generateUVFromGeometry(false);  // По умолчанию per-face.
+    }
+
+    public void generateUVFromGeometry(boolean globalNormalize) {
         textureCoords.clear();
 
+        double minX = Double.MAX_VALUE, maxX = Double.MIN_VALUE;
+        double minY = Double.MAX_VALUE, maxY = Double.MIN_VALUE;
+        double minZ = Double.MAX_VALUE, maxZ = Double.MIN_VALUE;
+        if (globalNormalize) {
+            for (Vector3D vertex : vertices) {
+                minX = Math.min(minX, vertex.getX());
+                maxX = Math.max(maxX, vertex.getX());
+                minY = Math.min(minY, vertex.getY());
+                maxY = Math.max(maxY, vertex.getY());
+                minZ = Math.min(minZ, vertex.getZ());
+                maxZ = Math.max(maxZ, vertex.getZ());
+            }
+        }
+
+        int texIndexOffset = 0;
         for (Polygon polygon : polygons) {
             List<Integer> indices = polygon.getVertexIndices();
             if (indices.size() < 3) continue;
@@ -102,13 +121,13 @@ public class Model3D {
             double nz = Math.abs(polygon.getNormal().getZ());
 
             String plane = "XY";
-            if (nz > nx && nz > ny) plane = "XY"; // Z-нормаль → проецируем на XY
-            else if (ny > nx && ny > nz) plane = "XZ"; // Y-нормаль → проецируем на XZ
-            else if (nx > ny && nx > nz) plane = "YZ"; // X-нормаль → проецируем на YZ
+            if (nz > nx && nz > ny) plane = "XY";
+            else if (ny > nx && ny > nz) plane = "XZ";
+            else if (nx > ny && nx > nz) plane = "YZ";
 
             for (int i = 0; i < indices.size(); i++) {
                 Vector3D vertex = vertices.get(indices.get(i));
-                double u, v;
+                double u = 0, v = 0;
 
                 switch (plane) {
                     case "XY":
@@ -123,23 +142,36 @@ public class Model3D {
                         u = vertex.getY();
                         v = vertex.getZ();
                         break;
-                    default:
-                        u = vertex.getX();
-                        v = vertex.getY();
                 }
 
-                u = (u + 1) / 2;
-                v = (v + 1) / 2;
+                if (globalNormalize) {
+                    switch (plane) {
+                        case "XY":
+                            u = (u - minX) / (maxX - minX);
+                            v = (v - minY) / (maxY - minY);
+                            break;
+                        case "XZ":
+                            u = (u - minX) / (maxX - minX);
+                            v = (v - minZ) / (maxZ - minZ);
+                            break;
+                        case "YZ":
+                            u = (u - minY) / (maxY - minY);
+                            v = (v - minZ) / (maxZ - minZ);
+                            break;
+                    }
+                } else {
+                    u = (u + 1) / 2;
+                    v = (v + 1) / 2;
+                }
 
                 addTextureCoord(u, v);
             }
-        }
 
-        for (Polygon polygon : polygons) {
             polygon.setTextureIndices(new ArrayList<>());
-            for (int i = 0; i < polygon.getVertexIndices().size(); i++) {
-                polygon.addTextureIndex(i);
+            for (int i = 0; i < indices.size(); i++) {
+                polygon.addTextureIndex(texIndexOffset + i);
             }
+            texIndexOffset += indices.size();
         }
     }
 

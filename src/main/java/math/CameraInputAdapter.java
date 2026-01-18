@@ -69,7 +69,7 @@ public class CameraInputAdapter {
      */
     public void onMouseDragged(float deltaX, float deltaY) {
         // Обновляем углы
-        yaw -= deltaX * rotateSpeed;
+        yaw += deltaX * rotateSpeed;
         pitch -= deltaY * rotateSpeed;
 
         // Ограничиваем pitch, чтобы камера не переворачивалась

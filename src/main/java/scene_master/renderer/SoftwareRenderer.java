@@ -183,8 +183,7 @@ public class SoftwareRenderer {
                 double[] screen2 = projectWithCamera(world2, viewMatrix, projectionMatrix);
                 double[] screen3 = projectWithCamera(world3, viewMatrix, projectionMatrix);
 
-                renderTriangle(screen1, screen2, screen3, model, polygon, textureReady);
-            }
+                renderTriangle(screen1, screen2, screen3, world1, world2, world3, model, polygon, textureReady);            }
         }
 
         if (renderWireframe) {
@@ -218,7 +217,11 @@ public class SoftwareRenderer {
     /**
      * Рендеринг одного треугольника
      */
+    /**
+     * Рендеринг одного треугольника
+     */
     private void renderTriangle(double[] p1, double[] p2, double[] p3,
+                                double[] world1, double[] world2, double[] world3,
                                 Model3D model, Polygon polygon, boolean textureReady) {
 
         Vector3D faceNormal = polygon.getNormal();
@@ -288,13 +291,24 @@ public class SoftwareRenderer {
                             };
                         }
 
+                        // Интерполируем мировые координаты точки
+                        double wx = w1 * world1[0] + w2 * world2[0] + w3 * world3[0];
+                        double wy = w1 * world1[1] + w2 * world2[1] + w3 * world3[1];
+                        double wz = w1 * world1[2] + w2 * world2[2] + w3 * world3[2];
+
                         Color pixelColor;
-                        if (textureReady) {
-                            pixelColor = calculatePixelColor(model, u, v, interpolatedNormal);
+                        if (useTexture && textureReady && !model.getTextureCoords().isEmpty()) {
+                            // Сначала получаем цвет из текстуры
+                            pixelColor = textureManager.getTextureColor(model.getTexture(), u, v);
+                            // Затем применяем к нему освещение
+                            if (useLighting && interpolatedNormal != null) {
+                                pixelColor = applyLightingToColor(pixelColor, interpolatedNormal, wx, wy, wz);
+                            }
                         } else {
+                            // Без текстуры используем базовый цвет модели
                             pixelColor = model.getBaseColor();
                             if (useLighting && interpolatedNormal != null) {
-                                pixelColor = applyLightingToColor(pixelColor, interpolatedNormal);
+                                pixelColor = applyLightingToColor(pixelColor, interpolatedNormal, wx, wy, wz);
                             }
                         }
 
@@ -303,6 +317,42 @@ public class SoftwareRenderer {
                 }
             }
         }
+    }
+
+    /**
+     * Применение освещения к цвету
+     */
+    private Color applyLightingToColor(Color color, double[] normal, double worldX, double worldY, double worldZ) {
+        if (normal == null || !useLighting) return color;
+
+        // Нормализуем нормаль
+        double len = Math.sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
+        if (len > 0) {
+            normal[0] /= len;
+            normal[1] /= len;
+            normal[2] /= len;
+        }
+
+        // ИСТОЧНИК СВЕТА = ПОЗИЦИЯ КАМЕРЫ
+        Vector3D lightPos = camera.getPosition();
+        Vector3D surfacePoint = new Vector3D((float)worldX, (float)worldY, (float)worldZ);
+        Vector3D lightDir = lightPos.subtract(surfacePoint).normalize();
+
+        double lx = lightDir.getX();
+        double ly = lightDir.getY();
+        double lz = lightDir.getZ();
+
+        double dot = normal[0] * lx + normal[1] * ly + normal[2] * lz;
+        dot = Math.max(0, dot);
+
+        double intensity = ambientLight + diffuseIntensity * dot;
+        intensity = Math.max(0.2, Math.min(1.0, intensity));
+
+        double r = Math.min(1.0, color.getRed() * intensity);
+        double g = Math.min(1.0, color.getGreen() * intensity);
+        double b = Math.min(1.0, color.getBlue() * intensity);
+
+        return new Color(r, g, b, color.getOpacity());
     }
 
     /**
@@ -315,7 +365,7 @@ public class SoftwareRenderer {
     /**
      * Вычисление цвета пикселя
      */
-    Color calculatePixelColor(Model3D model, double u, double v, double[] normal) {
+    Color calculatePixelColor(Model3D model, double u, double v, double[] normal, double worldX, double worldY, double worldZ) {
         Color baseColor = model.getBaseColor();
         boolean hasTexture = useTexture && model.getTexture() != null && !model.getTextureCoords().isEmpty();
 
@@ -324,37 +374,10 @@ public class SoftwareRenderer {
         }
 
         if (useLighting && normal != null) {
-            baseColor = applyLightingToColor(baseColor, normal);
+            baseColor = applyLightingToColor(baseColor, normal, worldX, worldY, worldZ);
         }
 
         return baseColor;
-    }
-
-    /**
-     * Применение освещения к цвету
-     */
-    Color applyLightingToColor(Color color, double[] normal) {
-        if (normal == null || !useLighting) return color;
-
-        double len = Math.sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
-        if (len > 0) {
-            normal[0] /= len;
-            normal[1] /= len;
-            normal[2] /= len;
-        }
-
-        Vector3D lightDir = camera.getTarget().subtract(camera.getPosition()).normalize();
-        double lx = lightDir.getX();
-        double ly = lightDir.getY();
-        double lz = lightDir.getZ();
-
-        double dot = normal[0] * lx + normal[1] * ly + normal[2] * lz;
-        dot = Math.max(0, dot);
-
-        double intensity = ambientLight + diffuseIntensity * dot;
-        intensity = Math.max(0.2, Math.min(1.0, intensity));
-
-        return color.deriveColor(0, 1.0, intensity, 1.0);
     }
 
     /**
